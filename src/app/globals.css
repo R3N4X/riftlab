@@ -1,0 +1,102 @@
+@import "tailwindcss";
+
+/*
+ * Paleta "Hextech nocturno": azul pizarra profundo con el dorado y el azul
+ * del cliente de League como acentos. Verde azulado = victoria, rosa = derrota.
+ */
+@theme {
+  --color-night: #080c13;
+  --color-surface: #0f151e;
+  --color-raised: #172130;
+  --color-line: #233143;
+  --color-ink: #e6eaf0;
+  --color-muted: #8a9ab0;
+  --color-dim: #5d6d82;
+  --color-gold: #c9a45c;
+  --color-gold-soft: #e8d3a2;
+  --color-hex: #4fa3d9;
+  --color-win: #3fb8a5;
+  --color-loss: #e0566b;
+
+  --color-tier-splus: #f2c86b;
+  --color-tier-s: #e9a24a;
+  --color-tier-a: #4fa3d9;
+  --color-tier-b: #8fb3c9;
+  --color-tier-c: #8a9ab0;
+  --color-tier-d: #6b7686;
+
+  --font-sans: var(--font-barlow), system-ui, sans-serif;
+  --font-display: var(--font-barlow-condensed), var(--font-barlow), sans-serif;
+}
+
+/*
+ * Colores de gráficos como variables normales (no de @theme): los usan
+ * atributos SVG con var(), que Tailwind no detecta al limpiar variables.
+ * El azul está ajustado para pasar el chequeo de daltonismo contra --color-surface.
+ */
+:root {
+  /* Alto de la barra de título integrada; la app de escritorio lo cambia a 32px. */
+  --titlebar-h: 0px;
+  --chart-ahead: #4799cf;
+  --chart-behind: #e0566b;
+}
+
+html {
+  color-scheme: dark;
+}
+
+body {
+  background: var(--color-night);
+  color: var(--color-ink);
+  font-family: var(--font-sans);
+  font-feature-settings: "tnum" 1;
+}
+
+::selection {
+  background: color-mix(in oklab, var(--color-gold) 40%, transparent);
+}
+
+:focus-visible {
+  outline: 2px solid var(--color-gold);
+  outline-offset: 2px;
+}
+
+/* Barras de scroll discretas en tablas largas. */
+* {
+  scrollbar-width: thin;
+  scrollbar-color: var(--color-line) transparent;
+}
+
+/* Barra lateral: se desplaza con la rueda pero sin barra visible, así no se achica al aparecer. */
+.no-scrollbar {
+  scrollbar-width: none;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  *,
+  *::before,
+  *::after {
+    animation-duration: 0.01ms !important;
+    transition-duration: 0.01ms !important;
+  }
+}
+
+/*
+ * Barra de título de la app de escritorio: zona para arrastrar la ventana,
+ * del mismo color que la app (los botones de Windows van encima, a la derecha).
+ */
+body {
+  padding-top: var(--titlebar-h);
+}
+
+.titlebar {
+  position: fixed;
+  inset: 0 0 auto 0;
+  z-index: 60;
+  height: var(--titlebar-h);
+  background: var(--color-night);
+  /* Sombra en vez de borde: en el navegador el alto es 0 y no debe verse nada. */
+  box-shadow: inset 0 -1px 0 var(--color-line);
+  -webkit-app-region: drag;
+  app-region: drag;
+}

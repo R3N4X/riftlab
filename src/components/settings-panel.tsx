@@ -1,0 +1,438 @@
+"use client";
+
+import Link from "next/link";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { PLATFORMS, type Platform } from "@/lib/constants";
+import { profilePath, type ActionResult, type DesktopSettings, type UpdateStatus } from "@/lib/live";
+import { setPreferredPlatform, usePreferredPlatform } from "@/lib/preferences";
+import { useDesktopAccount } from "./live-client";
+
+const noop = () => () => {};
+
+/** null en el servidor; false en el navegador; true en la app de escritorio. */
+function useIsDesktop() {
+  return useSyncExternalStore(
+    noop,
+    () => Boolean(window.riftlab),
+    () => null,
+  );
+}
+
+function useClientConnected() {
+  const [connected, setConnected] = useState(false);
+  useEffect(() => {
+    const bridge = window.riftlab;
+    if (!bridge) return;
+    void bridge.getState().then((s) => setConnected(s.connected));
+    return bridge.onState((s) => setConnected(s.connected));
+  }, []);
+  return connected;
+}
+
+export function SettingsPanel({ patch }: { patch: string }) {
+  const isDesktop = useIsDesktop();
+  const [settings, setSettings] = useState<DesktopSettings | null>(null);
+
+  useEffect(() => {
+    if (isDesktop) void window.riftlab?.getSettings().then(setSettings);
+  }, [isDesktop]);
+
+  return (
+    <div className="grid max-w-4xl gap-4">
+      {isDesktop === false && (
+        <p className="rounded-md border border-line bg-surface px-4 py-3 text-sm text-muted">
+          La cuenta de League, la clave de Riot y el inicio automático se configuran en la app de escritorio de RiftLab. Aquí solo se guarda
+          el servidor de búsqueda, en este navegador.
+        </p>
+      )}
+
+      {isDesktop && <AccountSection />}
+      <SearchSection />
+      {isDesktop && settings && <StartupSection settings={settings} onChange={setSettings} />}
+      {isDesktop && settings && <ApiKeySection settings={settings} />}
+      {isDesktop && <UpdatesSection />}
+
+      <SettingsCard title="Acerca de RiftLab">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-6 gap-y-1 text-sm">
+          {settings && (
+            <>
+              <dt className="text-muted">Versión de la app</dt>
+              <dd>{settings.version}</dd>
+            </>
+          )}
+          <dt className="text-muted">Parche de los datos</dt>
+          <dd>{patch}</dd>
+        </dl>
+        <p className="mt-3 text-xs text-dim">
+          RiftLab no está respaldado por Riot Games. League of Legends es marca registrada de Riot Games, Inc.
+        </p>
+      </SettingsCard>
+    </div>
+  );
+}
+
+function SettingsCard({ title, description, children }: { title: string; description?: string; children: React.ReactNode }) {
+  return (
+    // Mismo estilo que Panel de ui.tsx, que no se importa aquí porque arrastra código de servidor.
+    <section className="rounded-lg border border-line bg-surface p-5">
+      <h2 className="font-display text-xl font-semibold">{title}</h2>
+      {description && <p className="mt-1 text-sm text-muted">{description}</p>}
+      <div className="mt-4">{children}</div>
+    </section>
+  );
+}
+
+function Feedback({ result }: { result: ActionResult | null }) {
+  if (!result) return null;
+  return (
+    <p role="status" className={`mt-2 text-sm ${result.ok ? "text-win" : "text-loss"}`}>
+      {result.message}
+    </p>
+  );
+}
+
+const fieldClass =
+  "h-10 rounded-md border border-line bg-night/80 px-3 text-sm text-ink outline-none placeholder:text-dim focus:border-gold";
+const primaryButton =
+  "h-10 rounded-md bg-gold px-4 font-display font-semibold text-night transition-colors hover:bg-gold-soft disabled:cursor-not-allowed disabled:opacity-60";
+const secondaryButton =
+  "h-10 rounded-md border border-line px-4 text-sm text-ink transition-colors hover:bg-raised/60 disabled:cursor-not-allowed disabled:opacity-60";
+
+/* ---------- Cuenta ---------- */
+
+function AccountSection() {
+  const account = useDesktopAccount();
+  const connected = useClientConnected();
+  const [riotId, setRiotId] = useState("");
+  const [platform, setPlatform] = useState<Platform>(usePreferredPlatform());
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ActionResult | null>(null);
+
+  async function link(e: React.FormEvent) {
+    e.preventDefault();
+    const value = riotId.trim();
+    const hash = value.lastIndexOf("#");
+    if (hash <= 0 || hash === value.length - 1) {
+      setResult({ ok: false, message: "Escribe el Riot ID completo, con el tag: Nombre#TAG" });
+      return;
+    }
+    setBusy(true);
+    setResult(null);
+    try {
+      // Se confirma con Riot antes de guardar: así se guarda con las mayúsculas correctas.
+      const slug = encodeURIComponent(`${value.slice(0, hash)}-${value.slice(hash + 1)}`);
+      const res = await fetch(`/api/cuenta/${platform}/${slug}`);
+      const body = await res.json();
+      if (!res.ok) {
+        setResult({ ok: false, message: body.error ?? "No se pudo comprobar la cuenta" });
+        return;
+      }
+      const saved = await window.riftlab!.setAccount({ gameName: body.gameName, tagLine: body.tagLine, platform });
+      setResult(saved);
+      if (saved.ok) setRiotId("");
+    } catch {
+      setResult({ ok: false, message: "No se pudo comprobar la cuenta. Revisa tu conexión." });
+    } finally {
+      setBusy(false);
+    }
+  }
+
+  async function unlink() {
+    setResult(await window.riftlab!.setAccount(null));
+  }
+
+  return (
+    <SettingsCard
+      title="Cuenta de League"
+      description="RiftLab toma tu cuenta del cliente de League cuando lo abres e inicias sesión: no te pide contraseña. También puedes vincularla a mano con tu Riot ID."
+    >
+      <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-night/40 px-4 py-3">
+        <div className="min-w-0">
+          {account ? (
+            <>
+              <p className="font-display text-lg font-semibold">
+                {account.gameName}
+                <span className="text-dim">#{account.tagLine}</span>
+                <span className="ml-2 text-sm font-normal text-muted">{PLATFORMS[account.platform]?.label}</span>
+              </p>
+              <p className="text-xs text-muted">Cuenta vinculada</p>
+            </>
+          ) : (
+            <p className="text-muted">Sin cuenta vinculada</p>
+          )}
+          <p className="mt-1 flex items-center gap-1.5 text-xs text-dim">
+            <span className={`h-2 w-2 rounded-full ${connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
+            {connected ? "Cliente de League abierto" : "Cliente de League cerrado"}
+          </p>
+        </div>
+        {account && (
+          <div className="flex gap-2">
+            <Link href={profilePath(account)} className={`${secondaryButton} inline-flex items-center`}>
+              Ver mi perfil
+            </Link>
+            <button type="button" onClick={unlink} className={secondaryButton}>
+              Desvincular
+            </button>
+          </div>
+        )}
+      </div>
+      {account && connected && (
+        <p className="mt-2 text-xs text-dim">
+          Mientras el cliente esté abierto, la cuenta con la que iniciaste sesión se vuelve a vincular sola.
+        </p>
+      )}
+
+      <form onSubmit={link} className="mt-4">
+        <p className="mb-2 text-sm text-muted">{account ? "Vincular otra cuenta" : "Vincular a mano"}</p>
+        <div className="flex flex-wrap gap-2">
+          <label className="sr-only" htmlFor="ajustes-servidor-cuenta">
+            Servidor
+          </label>
+          <select
+            id="ajustes-servidor-cuenta"
+            value={platform}
+            onChange={(e) => setPlatform(e.target.value as Platform)}
+            className={fieldClass}
+          >
+            {Object.entries(PLATFORMS).map(([id, p]) => (
+              <option key={id} value={id} className="bg-surface">
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <label className="sr-only" htmlFor="ajustes-riot-id">
+            Riot ID
+          </label>
+          <input
+            id="ajustes-riot-id"
+            value={riotId}
+            onChange={(e) => setRiotId(e.target.value)}
+            placeholder="Nombre#TAG"
+            autoComplete="off"
+            spellCheck={false}
+            className={`${fieldClass} min-w-48 flex-1`}
+          />
+          <button type="submit" disabled={busy} className={primaryButton}>
+            {busy ? "Comprobando…" : "Vincular"}
+          </button>
+        </div>
+        <Feedback result={result} />
+      </form>
+    </SettingsCard>
+  );
+}
+
+/* ---------- Búsqueda ---------- */
+
+function SearchSection() {
+  const platform = usePreferredPlatform();
+  return (
+    <SettingsCard title="Búsqueda" description="Servidor que se usa al buscar un Riot ID sin elegir otro.">
+      <label className="flex items-center gap-3 text-sm">
+        <span className="text-muted">Servidor predeterminado</span>
+        <select value={platform} onChange={(e) => setPreferredPlatform(e.target.value as Platform)} className={fieldClass}>
+          {Object.entries(PLATFORMS).map(([id, p]) => (
+            <option key={id} value={id} className="bg-surface">
+              {p.label}
+            </option>
+          ))}
+        </select>
+      </label>
+    </SettingsCard>
+  );
+}
+
+/* ---------- Inicio ---------- */
+
+function StartupSection({ settings, onChange }: { settings: DesktopSettings; onChange: (s: DesktopSettings) => void }) {
+  const update = async (patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay">>) =>
+    onChange(await window.riftlab!.setSettings(patch));
+  return (
+    <SettingsCard title="Al iniciar">
+      <div className="space-y-3">
+        <Toggle label="Abrir RiftLab al iniciar Windows" checked={settings.openAtLogin} onChange={(v) => void update({ openAtLogin: v })} />
+        <Toggle
+          label="Abrir directo en mi perfil"
+          hint="Si está apagado, la app abre en el inicio."
+          checked={settings.openOnProfile}
+          onChange={(v) => void update({ openOnProfile: v })}
+        />
+        <Toggle
+          label="Ventana flotante en partidas de TFT"
+          hint="Se abre encima del juego con tus comps fijadas y las recetas. Ctrl + Shift + T la muestra u oculta."
+          checked={settings.tftOverlay}
+          onChange={(v) => void update({ tftOverlay: v })}
+        />
+      </div>
+    </SettingsCard>
+  );
+}
+
+function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+  return (
+    <label className="flex cursor-pointer items-center justify-between gap-4">
+      <span>
+        <span className="block text-sm">{label}</span>
+        {hint && <span className="block text-xs text-dim">{hint}</span>}
+      </span>
+      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
+      <span
+        aria-hidden="true"
+        className="relative h-6 w-11 shrink-0 rounded-full bg-raised transition-colors peer-checked:bg-gold peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-ink after:transition-transform peer-checked:after:translate-x-5 peer-checked:after:bg-night"
+      />
+    </label>
+  );
+}
+
+/* ---------- Clave de Riot ---------- */
+
+const KEY_SOURCE: Record<NonNullable<DesktopSettings["apiKey"]>, string> = {
+  ajustes: "Configurada desde Ajustes",
+  env: "Configurada en el archivo .env.local",
+};
+
+function ApiKeySection({ settings }: { settings: DesktopSettings }) {
+  const [key, setKey] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [result, setResult] = useState<ActionResult | null>(null);
+
+  async function save(value: string) {
+    setBusy(true);
+    setResult(null);
+    const r = await window.riftlab!.setApiKey(value);
+    setResult(r);
+    setBusy(false);
+    if (r.ok) setKey("");
+  }
+
+  return (
+    <SettingsCard
+      title="Clave de la API de Riot"
+      description="Los perfiles y el historial se leen de la API oficial de Riot, que exige una clave personal. Las claves de desarrollo vencen cada 24 horas: cuando los perfiles dejen de cargar, pega una nueva aquí."
+    >
+      <p className="mb-3 flex items-center gap-1.5 text-sm">
+        <span className={`h-2 w-2 rounded-full ${settings.apiKey ? "bg-win" : "bg-loss"}`} aria-hidden="true" />
+        {settings.apiKey ? KEY_SOURCE[settings.apiKey] : "Sin clave: los perfiles no van a cargar"}
+      </p>
+      <form
+        onSubmit={(e) => {
+          e.preventDefault();
+          void save(key);
+        }}
+        className="flex flex-wrap gap-2"
+      >
+        <label className="sr-only" htmlFor="ajustes-clave">
+          Clave nueva
+        </label>
+        <input
+          id="ajustes-clave"
+          type="password"
+          value={key}
+          onChange={(e) => setKey(e.target.value)}
+          placeholder="RGAPI-…"
+          autoComplete="off"
+          spellCheck={false}
+          className={`${fieldClass} min-w-64 flex-1 font-mono`}
+        />
+        <button type="submit" disabled={busy || !key.trim()} className={primaryButton}>
+          {busy ? "Probando…" : "Guardar y reiniciar"}
+        </button>
+        {settings.apiKey === "ajustes" && (
+          <button type="button" disabled={busy} onClick={() => void save("")} className={secondaryButton}>
+            Usar la del .env.local
+          </button>
+        )}
+      </form>
+      <Feedback result={result} />
+      <p className="mt-3 text-xs text-dim">
+        La clave se consigue en{" "}
+        <a href="https://developer.riotgames.com" target="_blank" rel="noreferrer" className="text-gold-soft hover:underline">
+          developer.riotgames.com
+        </a>{" "}
+        iniciando sesión con tu cuenta de Riot. Se guarda solo en este equipo.
+      </p>
+    </SettingsCard>
+  );
+}
+
+/* ---------- Actualizaciones ---------- */
+
+const UPDATE_LABEL: Record<UpdateStatus["state"], string> = {
+  disabled: "Desde el proyecto la app no se actualiza sola: se recompila.",
+  idle: "Lista para buscar actualizaciones.",
+  checking: "Buscando actualizaciones…",
+  downloading: "Descargando la versión nueva…",
+  ready: "Actualización lista para instalar.",
+  none: "Tienes la última versión.",
+  error: "No se pudo buscar la actualización.",
+};
+
+function UpdatesSection() {
+  const [status, setStatus] = useState<UpdateStatus | null>(null);
+  const [url, setUrl] = useState<string | null>(null);
+
+  useEffect(() => {
+    const bridge = window.riftlab;
+    if (!bridge?.getUpdate) return;
+    void bridge.getUpdate().then(setStatus);
+    return bridge.onUpdate(setStatus);
+  }, []);
+
+  if (!status) return null;
+  const field = url ?? status.url ?? "";
+  const progress = status.state === "downloading" && status.percent ? ` ${status.percent} %` : "";
+  return (
+    <SettingsCard
+      title="Actualizaciones"
+      description="La app instalada busca una versión nueva al abrirse y cada 6 horas, la descarga sola y la instala al cerrarse. Para compartirla con tus amigos, todos usan la misma dirección de actualizaciones."
+    >
+      <p
+        role="status"
+        className={`mb-3 text-sm ${status.state === "error" ? "text-loss" : status.state === "ready" ? "text-win" : "text-muted"}`}
+      >
+        {UPDATE_LABEL[status.state]}
+        {progress}
+        {status.version && status.state !== "none" && <> Versión {status.version}.</>}
+        {status.message && <span className="block text-xs text-dim">{status.message}</span>}
+      </p>
+      {status.state !== "disabled" && (
+        <form
+          onSubmit={(e) => {
+            e.preventDefault();
+            void window.riftlab!.setUpdateUrl(field).then(setStatus);
+            setUrl(null);
+          }}
+          className="flex flex-wrap gap-2"
+        >
+          <label className="sr-only" htmlFor="ajustes-actualizaciones">
+            Dirección de actualizaciones
+          </label>
+          <input
+            id="ajustes-actualizaciones"
+            value={field}
+            onChange={(e) => setUrl(e.target.value)}
+            placeholder="https://… (carpeta con latest.yml)"
+            spellCheck={false}
+            className={`${fieldClass} min-w-64 flex-1`}
+          />
+          <button type="submit" className={secondaryButton}>
+            Guardar
+          </button>
+          <button
+            type="button"
+            disabled={!status.url || status.state === "checking" || status.state === "downloading"}
+            onClick={() => void window.riftlab!.checkForUpdates().then(setStatus)}
+            className={secondaryButton}
+          >
+            Buscar ahora
+          </button>
+          {status.state === "ready" && (
+            <button type="button" onClick={() => void window.riftlab!.installUpdate()} className={primaryButton}>
+              Reiniciar y actualizar
+            </button>
+          )}
+        </form>
+      )}
+    </SettingsCard>
+  );
+}

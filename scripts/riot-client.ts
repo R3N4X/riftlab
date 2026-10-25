@@ -8,6 +8,13 @@ import { join } from "node:path";
 /* ---------- .env.local ---------- */
 
 export function loadEnv() {
+  // La clave guardada en Ajustes de la app de escritorio manda, igual que en la app: así se pega en un solo lugar.
+  try {
+    const settings = JSON.parse(readFileSync(join(process.env.APPDATA ?? "", "riftlab", "ajustes.json"), "utf8")) as { apiKey?: string };
+    if (settings.apiKey && !process.env.RIOT_API_KEY) process.env.RIOT_API_KEY = settings.apiKey;
+  } catch {
+    // sin ajustes guardados: se usa la del .env.local
+  }
   for (const file of [".env.local", ".env"]) {
     const path = join(process.cwd(), file);
     if (!existsSync(path)) continue;
@@ -100,4 +107,3 @@ export async function riot<T>(host: string, path: string): Promise<T | null> {
   }
   return null;
 }
-

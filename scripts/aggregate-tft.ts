@@ -12,7 +12,7 @@
  *   --matches 10            Partidas por jugador
  *   --days 4                Solo partidas de los últimos N días
  *   --rate 20:1,100:120     Límites de la API key (los de una Development Key)
- *   --reserve la2           En la región de este servidor usa la mitad del límite
+ *   --reserve la2           En la región de este servidor usa el 30 % del límite
  *                           para que la app pueda seguir buscando perfiles
  *   --reset                 Empieza de cero
  *
@@ -136,7 +136,7 @@ async function main() {
   }
   const reservedHosts = opts.reserve ? new Set<string>([opts.reserve, PLATFORMS[opts.reserve].region]) : new Set<string>();
   setRateLimits((host) =>
-    reservedHosts.has(host) ? opts.rate.map((l) => ({ ...l, limit: Math.max(1, Math.floor(l.limit * 0.5)) })) : opts.rate,
+    reservedHosts.has(host) ? opts.rate.map((l) => ({ ...l, limit: Math.max(1, Math.floor(l.limit * 0.3)) })) : opts.rate,
   );
 
   const versions = (await (await fetch("https://ddragon.leagueoflegends.com/api/versions.json")).json()) as string[];

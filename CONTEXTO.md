@@ -106,6 +106,12 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 - Probado: el paquete arranca su servidor y sirve las páginas con los datos incluidos. Falta probar una actualización real (no hay dónde publicarla todavía).
 - La clave de Riot en la app instalada va en Ajustes (no hay `.env.local`). La carpeta de ajustes es la misma que la de la app del proyecto (`%APPDATA%\riftlab`).
 
+### Recolector automático
+- `scripts/recolector.ps1`: ciclo sin fin (LoL en cada vuelta, TFT cada 4, 5 min de pausa entre vueltas), una sola copia (mutex), registro en `%LOCALAPPDATA%\riftlab\recolector.log` (rota a los 5 MB).
+- Arranca solo al iniciar sesión en Windows con el acceso directo `RiftLab recolector.lnk` de la carpeta Inicio (PowerShell oculto). No depende de la app ni de Claude.
+- Para detenerlo: cerrar los procesos node del recolector (o el powershell de `recolector.ps1`); para que no arranque más, borrar ese acceso directo.
+- Ya no hace falta lanzar `npm run aggregate` a mano. Si se lanza a mano mientras corre el ciclo, se duplican las consultas.
+
 ### Límite de la API (100 consultas cada 2 min, compartido con el agregador)
 - El agregador usa solo el 30 % en la2 y americas (`--reserve`), la app el resto.
 - `src/lib/riot.ts` cuenta las consultas de la app por host; tras un 429 bloquea ese host hasta que pase el `retry-after` (no insiste). El rango de cada jugador de las tarjetas (`src/lib/match-rank.ts`) se salta si `isRiotBusy` (≥ 45 consultas en 2 min), para no dejar sin consultas al perfil.

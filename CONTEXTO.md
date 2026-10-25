@@ -12,7 +12,8 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 - Prueba sin ventana: `electron . --prod --smoke` con `RIFTLAB_SMOKE_SHOT=captura.png`, `RIFTLAB_SMOKE_OVERLAY=flotante.png`, `RIFTLAB_SMOKE_CLICK=/ruta`.
 - El servidor de desarrollo (`npm run dev`, puerto 3000) a veces queda con la barra lateral vieja en caché: reiniciarlo.
 - Formato: prettier con `--print-width 140` (no hay config; sin ese ancho reformatea todo).
-- Clave de Riot: `.env.local` o la guardada desde Ajustes (`%APPDATA%\riftlab\ajustes.json`, manda sobre la otra). Las de desarrollo duran 24 h.
+- Clave de Riot: `.env.local` o la guardada desde Ajustes (`%APPDATA%\riftlab\ajustes.json`, manda sobre la otra, también para los recolectores). Desde el 25-10-2026 está guardada en Ajustes una Personal API Key aprobada por Riot, que no vence (la del `.env.local` es una de desarrollo vieja).
+- Repositorio público: https://github.com/R3N4X/riftlab (commits como `R3N4X <R3N4X@users.noreply.github.com>`, configurado solo en este repo). `gh` tiene dos cuentas: para subir cambios, `gh auth switch --hostname github.com --user R3N4X` y después volver a la del trabajo. `data/` no se sube (tiene Riot ID de terceros).
 
 ## Lo que se hizo
 

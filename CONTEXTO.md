@@ -112,6 +112,7 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 - La app (`src/lib/riot.ts`) usa la clave propia si hay (Ajustes o `.env.local`) y, si no, el intermediario (`RIFTLAB_PROXY_URL` + `RIFTLAB_PROXY_CODE`). Instalada, los lee de `resources/proxy.json`, que arma `scripts/stage-installer.ts` desde el `.env.local` (`npm run dist` falla si faltan). Ajustes muestra "Usando el servidor del grupo".
 - Desplegar o cambiar la clave: `powershell -NoProfile -ExecutionPolicy Bypass -File scripts\desplegar-intermediario.ps1` (inicia sesión en Cloudflare si hace falta, despliega, carga los secretos desde el `.env.local`, lo prueba y anota `RIFTLAB_PROXY_URL`). Lo corre el usuario.
 - El código del grupo viaja dentro del instalador público: es una barrera simple, no un secreto fuerte. La clave nunca sale de Cloudflare. Todos comparten el límite de la clave (la app tiene el 70 % en la2/americas; el recolector, el 30 %).
+- Desplegado el 26-10-2026 en `https://riftlab.la-fecha-futbolera.workers.dev` y publicado en la 0.2.1 (https://github.com/R3N4X/riftlab/releases/tag/v0.2.1). Si `npm` falla por la política de ejecución de PowerShell, usar `npm.cmd`; antes de `npm run dist` hay que cerrar RiftLab (bloquea `.next/standalone`).
 - Probado en local con `wrangler dev`: 403 sin código o con código malo, 404 con host o ruta fuera de la lista, 405 con POST, perfil completo cargado sin clave propia.
 
 ### Recolector automático

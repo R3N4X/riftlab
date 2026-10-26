@@ -184,6 +184,34 @@ function restoreServerModules(dir: string) {
   }
 }
 
+/**
+ * Clave que usa el servidor: la de Ajustes manda, pero si Riot la rechaza (una de desarrollo
+ * vencida) y la del .env.local funciona, se usa esa y se borra la vencida de Ajustes.
+ */
+async function pickApiKey(): Promise<string | undefined> {
+  const saved = readSettings().apiKey;
+  const fromEnv = readEnvFile().RIOT_API_KEY;
+  if (!saved || !fromEnv || saved === fromEnv) return saved ?? fromEnv;
+  const status = async (key: string) => {
+    try {
+      const res = await fetch(`https://${account?.platform ?? "la2"}.api.riotgames.com/lol/status/v4/platform-data`, {
+        headers: { "X-Riot-Token": key },
+        signal: AbortSignal.timeout(4000),
+      });
+      return res.status;
+    } catch {
+      return 0;
+    }
+  };
+  const savedStatus = await status(saved);
+  if (savedStatus !== 401 && savedStatus !== 403) return saved;
+  if ((await status(fromEnv)) !== 200) return saved;
+  const rest = readSettings();
+  delete rest.apiKey;
+  writeSettings(rest);
+  return fromEnv;
+}
+
 async function startServer(): Promise<string> {
   if (!PROD) {
     if (await waitFor(DEV_URL, 1500)) return DEV_URL;
@@ -196,6 +224,7 @@ async function startServer(): Promise<string> {
   if (app.isPackaged) restoreServerModules(SERVER_DIR);
   const standalone = join(SERVER_DIR, "server.js");
   if (!existsSync(standalone)) throw new Error("Falta la compilación. Ejecuta: npm run desktop:build");
+  const apiKey = await pickApiKey();
   const port = await freePort();
   server = spawn(process.execPath, [standalone], {
     cwd: SERVER_DIR,
@@ -205,7 +234,7 @@ async function startServer(): Promise<string> {
       ...process.env,
       ...readEnvFile(),
       // La clave guardada desde Ajustes manda sobre la del .env.local.
-      ...(readSettings().apiKey ? { RIOT_API_KEY: readSettings().apiKey } : {}),
+      ...(apiKey ? { RIOT_API_KEY: apiKey } : {}),
       ELECTRON_RUN_AS_NODE: "1",
       NODE_ENV: "production",
       PORT: String(port),

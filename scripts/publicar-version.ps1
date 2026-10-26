@@ -1,4 +1,4 @@
-# Publica en GitHub (R3N4X/riftlab) el instalador ya compilado con `npm run dist`, como un Release.
+﻿# Publica en GitHub (R3N4X/riftlab) el instalador ya compilado con `npm run dist`, como un Release.
 # La app instalada busca ahí las versiones nuevas y se actualiza sola.
 # Uso: subir "version" en package.json y correr `npm run release` (compila y publica).
 # Necesita la cuenta R3N4X conectada en gh; si la activa es otra, cambia a R3N4X y al final vuelve.

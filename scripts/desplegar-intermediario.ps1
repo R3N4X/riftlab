@@ -1,4 +1,4 @@
-# Despliega el intermediario de RiftLab (carpeta intermediario/) en Cloudflare Workers y le carga
+﻿# Despliega el intermediario de RiftLab (carpeta intermediario/) en Cloudflare Workers y le carga
 # los secretos desde el .env.local: RIOT_API_KEY y el código del grupo (RIFTLAB_PROXY_CODE).
 # Al final anota la dirección en el .env.local (RIFTLAB_PROXY_URL) para que `npm run dist` la
 # incluya en el instalador. Correrlo de nuevo si cambia la clave de Riot.

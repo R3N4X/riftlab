@@ -131,6 +131,8 @@ export interface DesktopSettings {
   openOnProfile: boolean;
   /** Abrir la ventana flotante de TFT al empezar una partida. */
   tftOverlay: boolean;
+  /** Importar sola la build Top 1 al bloquear el campeón. Apagado salvo que el jugador lo active. */
+  autoImport: boolean;
 }
 
 /** Estado de las actualizaciones automáticas (solo en la app instalada). */
@@ -153,7 +155,7 @@ export interface DesktopBridge {
   /** Vincula una cuenta a mano, o la desvincula con null. */
   setAccount(account: DesktopAccount | null): Promise<ActionResult>;
   getSettings(): Promise<DesktopSettings>;
-  setSettings(patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay">>): Promise<DesktopSettings>;
+  setSettings(patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport">>): Promise<DesktopSettings>;
   /** Prueba la clave contra Riot, la guarda y reinicia la app. Vacía, vuelve a la del .env.local. */
   setApiKey(key: string): Promise<ActionResult>;
   importRunes(page: RunePagePayload): Promise<ActionResult>;

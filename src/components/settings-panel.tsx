@@ -2,7 +2,7 @@
 
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
-import { PLATFORMS, type Platform } from "@/lib/constants";
+import { LEGAL_NOTICE_EN, LEGAL_NOTICE_ES, PLATFORMS, type Platform } from "@/lib/constants";
 import { profilePath, type ActionResult, type DesktopSettings, type UpdateStatus } from "@/lib/live";
 import { setPreferredPlatform, usePreferredPlatform } from "@/lib/preferences";
 import { useDesktopAccount } from "./live-client";
@@ -63,8 +63,9 @@ export function SettingsPanel({ patch }: { patch: string }) {
           <dt className="text-muted">Parche de los datos</dt>
           <dd>{patch}</dd>
         </dl>
-        <p className="mt-3 text-xs text-dim">
-          RiftLab no está respaldado por Riot Games. League of Legends es marca registrada de Riot Games, Inc.
+        <p className="mt-3 text-xs text-dim">{LEGAL_NOTICE_ES}</p>
+        <p lang="en" className="mt-2 text-xs text-dim">
+          {LEGAL_NOTICE_EN}
         </p>
       </SettingsCard>
     </div>
@@ -280,7 +281,7 @@ function SearchSection() {
 /* ---------- Inicio ---------- */
 
 function StartupSection({ settings, onChange }: { settings: DesktopSettings; onChange: (s: DesktopSettings) => void }) {
-  const update = async (patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay">>) =>
+  const update = async (patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport">>) =>
     onChange(await window.riftlab!.setSettings(patch));
   return (
     <SettingsCard title="Al iniciar">
@@ -297,6 +298,12 @@ function StartupSection({ settings, onChange }: { settings: DesktopSettings; onC
           hint="Se abre encima del juego con tus comps fijadas y las recetas. Ctrl + Shift + T la muestra u oculta."
           checked={settings.tftOverlay}
           onChange={(v) => void update({ tftOverlay: v })}
+        />
+        <Toggle
+          label="Importar la build sola al bloquear el campeón"
+          hint="Runas, hechizos y objetos de la build Top 1 sin tocar nada. Apagado, se importan solo con los botones de En vivo."
+          checked={settings.autoImport}
+          onChange={(v) => void update({ autoImport: v })}
         />
       </div>
     </SettingsCard>

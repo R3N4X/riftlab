@@ -63,6 +63,12 @@ export function isRankFilter(value: unknown): value is RankFilter {
   return typeof value === "string" && value in RANK_FILTERS;
 }
 
+/** Aviso legal con el texto exacto que exigen las políticas de Riot (developer.riotgames.com/policies/general). */
+export const LEGAL_NOTICE_EN =
+  "RiftLab isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.";
+export const LEGAL_NOTICE_ES =
+  "RiftLab no está respaldado por Riot Games y no refleja las opiniones de Riot Games ni de nadie involucrado oficialmente en la producción o gestión de sus propiedades. Riot Games y todas las propiedades asociadas son marcas comerciales o marcas registradas de Riot Games, Inc.";
+
 /** Servidores (plataformas) y su clúster regional para match-v5 / account-v1. */
 export const PLATFORMS = {
   la1: { label: "LAN", region: "americas" },

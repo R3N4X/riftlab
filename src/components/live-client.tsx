@@ -219,8 +219,8 @@ export function ImportBuildButton({ build }: { build: BuildPayload }) {
 }
 
 /**
- * Importa la build Top 1 una sola vez por selección de campeones, sin tocar
- * nada: cuando tu campeón está bloqueado y ya se ve el draft completo (etapa
+ * Si el jugador lo activó en Ajustes, importa la build Top 1 una sola vez por
+ * selección de campeones, sin tocar nada: cuando tu campeón está bloqueado y ya se ve el draft completo (etapa
  * final), así las botas y los objetos situacionales tienen en cuenta a todos
  * los rivales.
  */
@@ -228,9 +228,14 @@ export function AutoImportBuild({ championKey, build }: { championKey: string; b
   const state = useLiveState();
   const latest = useRef(build);
   const [result, setResult] = useState<ActionResult | null>(null);
+  // Solo si el jugador lo activó en Ajustes: importar sin que lo pida le quitaría la decisión.
+  const [enabled, setEnabled] = useState(false);
   useEffect(() => {
     latest.current = build;
   });
+  useEffect(() => {
+    void window.riftlab?.getSettings().then((s) => setEnabled(s.autoImport));
+  }, []);
 
   const cs = state?.champSelect;
   const me = cs?.myTeam.find((p) => p.isMe);
@@ -241,7 +246,7 @@ export function AutoImportBuild({ championKey, build }: { championKey: string; b
     (cs?.timerPhase === "FINALIZATION" || cs?.timerPhase === "GAME_STARTING");
 
   useEffect(() => {
-    if (!ready || autoImportedFor === championKey || !window.riftlab) return;
+    if (!enabled || !ready || autoImportedFor === championKey || !window.riftlab) return;
     // Pequeña espera: la página termina de recibir el draft final antes de importar.
     const timer = setTimeout(async () => {
       if (autoImportedFor === championKey) return;
@@ -254,7 +259,7 @@ export function AutoImportBuild({ championKey, build }: { championKey: string; b
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [ready, championKey]);
+  }, [enabled, ready, championKey]);
 
   if (!result) return null;
   return (

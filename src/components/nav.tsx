@@ -6,6 +6,7 @@ import { useState, useSyncExternalStore } from "react";
 import { FriendsBox } from "./friends";
 import { GlobalSearch, type SearchChampion } from "./global-search";
 import { useDesktopAccount } from "./live-client";
+import { LEGAL_NOTICE_EN } from "@/lib/constants";
 import { profilePath } from "@/lib/live";
 
 const LINKS = [
@@ -255,8 +256,8 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
             Ajustes
           </Link>
         </div>
-        <p className="mt-4 px-3 text-xs leading-relaxed text-dim">
-          RiftLab no está respaldado por Riot Games. League of Legends es marca registrada de Riot Games, Inc.
+        <p lang="en" className="mt-4 px-3 text-[11px] leading-relaxed text-dim">
+          {LEGAL_NOTICE_EN}
         </p>
       </aside>
     </>

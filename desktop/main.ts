@@ -94,6 +94,7 @@ interface StoredSettings {
   apiKey?: string;
   openOnProfile?: boolean;
   tftOverlay?: boolean;
+  autoImport?: boolean;
   /** Dirección de las actualizaciones automáticas (carpeta con latest.yml). */
   updateUrl?: string;
 }
@@ -123,6 +124,7 @@ function currentSettings(): DesktopSettings {
     openAtLogin: app.getLoginItemSettings(loginItem()).openAtLogin,
     openOnProfile: stored.openOnProfile ?? true,
     tftOverlay: stored.tftOverlay ?? true,
+    autoImport: stored.autoImport ?? false,
   };
 }
 
@@ -497,10 +499,11 @@ ipcMain.handle("account:set", (_e, next: DesktopAccount | null): ActionResult =>
 
 ipcMain.handle("settings:get", () => currentSettings());
 
-ipcMain.handle("settings:set", (_e, patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay">>) => {
+ipcMain.handle("settings:set", (_e, patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport">>) => {
   if (typeof patch?.openAtLogin === "boolean") app.setLoginItemSettings({ ...loginItem(), openAtLogin: patch.openAtLogin });
   if (typeof patch?.openOnProfile === "boolean") writeSettings({ ...readSettings(), openOnProfile: patch.openOnProfile });
   if (typeof patch?.tftOverlay === "boolean") writeSettings({ ...readSettings(), tftOverlay: patch.tftOverlay });
+  if (typeof patch?.autoImport === "boolean") writeSettings({ ...readSettings(), autoImport: patch.autoImport });
   return currentSettings();
 });
 

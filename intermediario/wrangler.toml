@@ -1,0 +1,7 @@
+# Intermediario de RiftLab en Cloudflare Workers (plan gratis).
+# Secretos (no van en este archivo): RIOT_API_KEY y GROUP_CODE, que se cargan con
+# scripts/desplegar-intermediario.ps1 desde el .env.local.
+name = "riftlab"
+main = "src/index.ts"
+compatibility_date = "2026-10-01"
+workers_dev = true

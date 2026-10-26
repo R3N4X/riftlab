@@ -119,7 +119,7 @@ function currentSettings(): DesktopSettings {
   const stored = readSettings();
   return {
     version: app.getVersion(),
-    apiKey: stored.apiKey ? "ajustes" : readEnvFile().RIOT_API_KEY ? "env" : null,
+    apiKey: stored.apiKey ? "ajustes" : readEnvFile().RIOT_API_KEY ? "env" : groupProxy() ? "grupo" : null,
     openAtLogin: app.getLoginItemSettings(loginItem()).openAtLogin,
     openOnProfile: stored.openOnProfile ?? true,
     tftOverlay: stored.tftOverlay ?? true,
@@ -137,6 +137,24 @@ function readEnvFile(): Record<string, string> {
     if (m) out[m[1]] = m[2];
   }
   return out;
+}
+
+/**
+ * Intermediario del grupo (Cloudflare), que guarda la clave de Riot: lo usan quienes no tienen
+ * clave propia. El instalador lo trae en proxy.json (scripts/stage-installer.ts lo arma desde el
+ * .env.local); desde el proyecto se lee directo del .env.local.
+ */
+function groupProxy(): { RIFTLAB_PROXY_URL: string; RIFTLAB_PROXY_CODE: string } | null {
+  let source: Record<string, string | undefined> = readEnvFile();
+  if (app.isPackaged) {
+    try {
+      source = JSON.parse(readFileSync(join(process.resourcesPath, "proxy.json"), "utf8")) as Record<string, string>;
+    } catch {
+      source = {};
+    }
+  }
+  const { RIFTLAB_PROXY_URL, RIFTLAB_PROXY_CODE } = source;
+  return RIFTLAB_PROXY_URL && RIFTLAB_PROXY_CODE ? { RIFTLAB_PROXY_URL, RIFTLAB_PROXY_CODE } : null;
 }
 
 function freePort(): Promise<number> {
@@ -233,6 +251,8 @@ async function startServer(): Promise<string> {
     env: {
       ...process.env,
       ...readEnvFile(),
+      // Sin clave propia, el servidor consulta a Riot a través del intermediario del grupo.
+      ...groupProxy(),
       // La clave guardada desde Ajustes manda sobre la del .env.local.
       ...(apiKey ? { RIOT_API_KEY: apiKey } : {}),
       ELECTRON_RUN_AS_NODE: "1",
@@ -514,7 +534,9 @@ ipcMain.handle("settings:api-key", async (_e, raw: string): Promise<ActionResult
     message: PROD
       ? key
         ? "Clave guardada. RiftLab se reinicia para usarla."
-        : "Se volvió a la clave del .env.local. RiftLab se reinicia."
+        : readEnvFile().RIOT_API_KEY
+          ? "Se volvió a la clave del .env.local. RiftLab se reinicia."
+          : "Clave quitada: RiftLab usa el servidor del grupo y se reinicia."
       : "Clave guardada. En modo desarrollo, next dev sigue usando la del .env.local.",
   };
 });

@@ -324,6 +324,7 @@ function Toggle({ label, hint, checked, onChange }: { label: string; hint?: stri
 const KEY_SOURCE: Record<NonNullable<DesktopSettings["apiKey"]>, string> = {
   ajustes: "Configurada desde Ajustes",
   env: "Configurada en el archivo .env.local",
+  grupo: "Usando el servidor del grupo: no necesitas clave propia",
 };
 
 function ApiKeySection({ settings }: { settings: DesktopSettings }) {
@@ -343,7 +344,7 @@ function ApiKeySection({ settings }: { settings: DesktopSettings }) {
   return (
     <SettingsCard
       title="Clave de la API de Riot"
-      description="Los perfiles y el historial se leen de la API oficial de Riot, que exige una clave personal. Las claves de desarrollo vencen cada 24 horas: cuando los perfiles dejen de cargar, pega una nueva aquí."
+      description="Los perfiles y el historial se leen de la API oficial de Riot. RiftLab usa la clave del servidor del grupo, así que no necesitas una propia; si tienes una, pégala aquí y tus consultas no gastarán las del grupo."
     >
       <p className="mb-3 flex items-center gap-1.5 text-sm">
         <span className={`h-2 w-2 rounded-full ${settings.apiKey ? "bg-win" : "bg-loss"}`} aria-hidden="true" />
@@ -374,7 +375,7 @@ function ApiKeySection({ settings }: { settings: DesktopSettings }) {
         </button>
         {settings.apiKey === "ajustes" && (
           <button type="button" disabled={busy} onClick={() => void save("")} className={secondaryButton}>
-            Usar la del .env.local
+            Quitar mi clave
           </button>
         )}
       </form>

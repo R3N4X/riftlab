@@ -124,8 +124,8 @@ export function profilePath(a: DesktopAccount): string {
 /** Ajustes de la app de escritorio (se guardan en la carpeta de datos de la app). */
 export interface DesktopSettings {
   version: string;
-  /** De dónde sale la clave de Riot: guardada desde Ajustes, del .env.local, o ninguna. */
-  apiKey: "ajustes" | "env" | null;
+  /** De dónde sale la clave de Riot: Ajustes, el .env.local, el servidor del grupo, o ninguna. */
+  apiKey: "ajustes" | "env" | "grupo" | null;
   openAtLogin: boolean;
   /** Abrir directo en el perfil de la cuenta vinculada en vez del inicio. */
   openOnProfile: boolean;

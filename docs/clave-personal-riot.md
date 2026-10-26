@@ -18,6 +18,7 @@ La clave de desarrollo vence cada 24 horas. Para que RiftLab funcione sin renova
 - Copia la clave nueva (empieza con `RGAPI-`) y pégala en **Ajustes → Clave de la API de Riot**. La app la prueba, la guarda y se reinicia.
 - Si usas el proyecto, también puedes ponerla en `.env.local` como `RIOT_API_KEY=...` (la de Ajustes manda).
 - El recolector de datos (`npm run aggregate`) usa la del `.env.local`.
+- Para que tus amigos no necesiten clave, la del `.env.local` se carga en el intermediario del grupo con `scripts\desplegar-intermediario.ps1`: queda guardada en Cloudflare, nunca en el instalador.
 
 ## Reglas que hay que respetar
 

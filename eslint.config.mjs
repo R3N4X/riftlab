@@ -18,6 +18,8 @@ const eslintConfig = defineConfig([
     "next-env.d.ts",
     // App de escritorio compilada por esbuild.
     "desktop/dist/**", "dist-installer/**",
+    // Intermediario de Cloudflare: lo compila wrangler.
+    "intermediario/**",
   ]),
 ]);
 

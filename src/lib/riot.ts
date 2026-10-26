@@ -1,6 +1,7 @@
 /**
  * Cliente de la API oficial de Riot Games (developer.riotgames.com).
- * Necesita RIOT_API_KEY en .env.local. La clave nunca sale del servidor.
+ * Usa RIOT_API_KEY (Ajustes o .env.local) y, si no hay, el intermediario del grupo
+ * (RIFTLAB_PROXY_URL + RIFTLAB_PROXY_CODE), que guarda la clave en Cloudflare.
  *
  * Límites de una Development Key: 20 req/s y 100 req/2 min.
  * Para producción hay que pedir una Production Key a Riot.
@@ -42,10 +43,20 @@ export function isRiotBusy(platform: Platform, maxCalls = 45, regional = false):
   return (blockedUntil.get(host) ?? 0) > Date.now() || callsInWindow(host) >= maxCalls;
 }
 
-const LIMIT_MSG = "Se alcanzó el límite de consultas de la clave de desarrollo (100 cada 2 minutos).";
+/** Intermediario del grupo: solo se usa cuando no hay clave propia. */
+function groupProxy(): { url: string; code: string } | null {
+  const url = process.env.RIFTLAB_PROXY_URL;
+  const code = process.env.RIFTLAB_PROXY_CODE;
+  return !process.env.RIOT_API_KEY && url && code ? { url: url.replace(/\/+$/, ""), code } : null;
+}
+
+const limitMessage = () =>
+  groupProxy()
+    ? "Se alcanzó el límite de consultas que comparte el grupo (100 cada 2 minutos)."
+    : "Se alcanzó el límite de consultas de la clave de Riot (100 cada 2 minutos).";
 
 export function hasRiotKey(): boolean {
-  return Boolean(process.env.RIOT_API_KEY);
+  return Boolean(process.env.RIOT_API_KEY || groupProxy());
 }
 
 function regionOf(platform: Platform): string {
@@ -62,16 +73,17 @@ const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export async function riotFetch<T>(host: string, path: string, retries = 3): Promise<T> {
   const key = process.env.RIOT_API_KEY;
-  if (!key) throw new RiotApiError(401, "Falta RIOT_API_KEY en .env.local");
+  const proxy = groupProxy();
+  if (!key && !proxy) throw new RiotApiError(401, "Falta la clave de la API de Riot");
 
   const blocked = (blockedUntil.get(host) ?? 0) - Date.now();
-  if (blocked > 0) throw new RiotApiError(429, LIMIT_MSG, Math.ceil(blocked / 1000));
+  if (blocked > 0) throw new RiotApiError(429, limitMessage(), Math.ceil(blocked / 1000));
   callsInWindow(host);
   recentCalls.get(host)!.push(Date.now());
 
-  const res = await fetch(`https://${host}.api.riotgames.com${path}`, {
-    headers: { "X-Riot-Token": key },
-  });
+  const res = proxy
+    ? await fetch(`${proxy.url}/${host}${path}`, { headers: { "X-RiftLab-Code": proxy.code } })
+    : await fetch(`https://${host}.api.riotgames.com${path}`, { headers: { "X-Riot-Token": key! } });
 
   if (res.status === 429 && retries > 0) {
     const wait = Number(res.headers.get("retry-after") ?? "2") * 1000;
@@ -85,7 +97,7 @@ export async function riotFetch<T>(host: string, path: string, retries = 3): Pro
   if (res.status === 429) {
     const wait = Number(res.headers.get("retry-after") ?? "30");
     blockedUntil.set(host, Date.now() + wait * 1000);
-    throw new RiotApiError(429, LIMIT_MSG, wait);
+    throw new RiotApiError(429, limitMessage(), wait);
   }
   if (res.status >= 500 && retries > 0) {
     await sleep(1000);
@@ -95,9 +107,13 @@ export async function riotFetch<T>(host: string, path: string, retries = 3): Pro
     const msg =
       res.status === 404
         ? "No encontrado"
-        : res.status === 401 || res.status === 403
-          ? "API key inválida o vencida (las Development Keys duran 24 h)"
-          : `Error ${res.status} de la API de Riot`;
+        : res.headers.get("x-riftlab-proxy") === "denied"
+          ? "El servidor del grupo no aceptó esta versión de RiftLab: actualiza la app."
+          : res.status === 401 || res.status === 403
+            ? proxy
+              ? "Riot rechazó la clave del servidor del grupo: avísale a quien lo administra."
+              : "API key inválida o vencida (las Development Keys duran 24 h)"
+            : `Error ${res.status} de la API de Riot`;
     throw new RiotApiError(res.status, msg);
   }
   return res.json() as Promise<T>;

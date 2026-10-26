@@ -56,3 +56,8 @@ next-env.d.ts
 
 # archivos de compilación del instalador
 /build/
+
+# intermediario de Cloudflare: dependencias, estado local y secretos de prueba
+/intermediario/node_modules
+/intermediario/.wrangler
+/intermediario/.dev.vars

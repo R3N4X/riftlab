@@ -14,6 +14,8 @@ import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, getSummone
 import { rememberPlayers } from "@/lib/players";
 import { kda, pct, timeAgo, wrClass } from "@/lib/format";
 import { parseString } from "@/lib/params";
+import { tiltCheck } from "@/lib/tilt";
+import { TiltBanner } from "@/components/tilt-notice";
 import {
   RiotApiError,
   getAccountByRiotId,
@@ -112,6 +114,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
     const solo = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
     const flex = entries.find((e) => e.queueType === "RANKED_FLEX_SR");
     const recent = summarize(matches, account.puuid);
+    const tilt = tiltCheck(matches, account.puuid, data.now);
     const lastPlayed = matches[0]
       ? (matches[0].info.gameEndTimestamp ?? matches[0].info.gameCreation + matches[0].info.gameDuration * 1000)
       : null;
@@ -155,6 +158,12 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
             </Link>
           </div>
         </section>
+
+        {tilt && (
+          <div className="px-4 pt-6 sm:px-8">
+            <TiltBanner notice={tilt} />
+          </div>
+        )}
 
         <div className="grid gap-6 px-4 py-6 sm:px-8 xl:grid-cols-[340px_minmax(0,1fr)]">
           <aside className="space-y-6">

@@ -80,6 +80,10 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 - `LoadingScreen` (`src/components/loading-screen.tsx`) pide `/api/en-vivo/jugadores` una vez por partida (`src/lib/live-players.ts`: espectador + liga + maestría con el campeón + últimas 3 partidas, todo en caché; las partidas se saltan si la región está cerca del límite) y muestra los 10 jugadores con rango, winrate, maestría, últimas partidas y avisos (primera vez / poca experiencia / main, rachas, winrate alto, recién subió, hace X días no lo juega).
 - Para probarla en el navegador sin estar en partida: `/en-vivo?jugadores=la2:<puuid de alguien en partida>`.
 
+### Aviso de tilt
+- `src/lib/tilt.ts` (`tiltCheck`): mira la sesión actual (partidas con menos de 90 min entre una y otra; nada si la última terminó hace más de 3 h o si ganó la última). Motivos: 3 o más derrotas seguidas, nota de las últimas 3 partidas 10 puntos o más bajo lo habitual (la misma nota del resumen), muertes ≥ 6 y 1,5 veces lo habitual, 6 o más partidas seguidas con mayoría de derrotas. Nivel "alto" con 4 derrotas seguidas o 3 motivos.
+- `TiltBanner` (`src/components/tilt-notice.tsx`) en el perfil (bajo la cabecera) y en el resumen post-partida (`SessionTilt`, con las últimas 10 partidas; se salta si `isRiotBusy`).
+
 ### Amigos en partida (solo app de escritorio)
 - `desktop/lcu.ts` lee `/lol-chat/v1/friends` cada 15 s (no gasta consultas a Riot) y lo publica en `LiveState.friends` (en partida, en selección, en cola, conectado; campeón, cola y hora de inicio).
 - Recuadro "Amigos jugando" en la barra lateral (`FriendsBox` en `src/components/friends.tsx`): quién está en partida o en selección, con estrella para los que juegas seguido (`/api/frecuentes`, `src/lib/frequent.ts`: compañeros repetidos en tus últimas 20 partidas). Campana para activar o desactivar los avisos (localStorage).

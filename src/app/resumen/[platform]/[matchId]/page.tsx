@@ -12,7 +12,9 @@ import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, type Champ
 import { duration, kda } from "@/lib/format";
 import { getGameReview, type GameReview, type LaneReview, type ReviewEvent } from "@/lib/game-review";
 import { parseString } from "@/lib/params";
-import { RiotApiError, errorMessage, getMatch, hasRiotKey, riotIdToSlug } from "@/lib/riot";
+import { RiotApiError, errorMessage, getMatch, getMatchIds, hasRiotKey, isRiotBusy, riotIdToSlug, type Match } from "@/lib/riot";
+import { tiltCheck } from "@/lib/tilt";
+import { TiltBanner } from "@/components/tilt-notice";
 
 export const metadata: Metadata = { title: "Resumen de la partida" };
 
@@ -44,7 +46,7 @@ async function ReviewContent({ params, searchParams }: Pick<PageProps<"/resumen/
     // Recién terminada, Riot tarda uno o dos minutos en publicar la partida.
     return (
       <Wrap>
-        <ErrorNote title={loaded.status === 404 ? "Riot todavía está procesando la partida" : "La API de Riot no respondió"}>
+        <ErrorNote title={loaded.status === 404 ? "Riot todavía está procesando la partida" : "No se pudo cargar la partida"}>
           {loaded.status === 404
             ? "La partida aparece en la API uno o dos minutos después de terminar. El resumen se carga solo apenas esté."
             : loaded.message}
@@ -137,6 +139,10 @@ async function ReviewContent({ params, searchParams }: Pick<PageProps<"/resumen/
           <span className="mt-1 text-xs text-dim">Nota {review.score} / 100</span>
         </div>
       </Panel>
+
+      <Suspense fallback={null}>
+        <SessionTilt platform={platform} puuid={me.puuid} match={match} />
+      </Suspense>
 
       <div className="grid gap-6 lg:grid-cols-[minmax(0,340px)_minmax(0,1fr)]">
         <Panel className="p-5">
@@ -402,4 +408,23 @@ function EventsStrip({
       </figcaption>
     </figure>
   );
+}
+
+/** Aviso de tilt con las partidas recientes del jugador; si Riot está ocupado, no se muestra. */
+async function SessionTilt({ platform, puuid, match }: { platform: Platform; puuid: string; match: Match }) {
+  const notice = await loadSessionTilt(platform, puuid, match);
+  return notice ? <TiltBanner notice={notice} /> : null;
+}
+
+async function loadSessionTilt(platform: Platform, puuid: string, match: Match) {
+  if (isRiotBusy(platform, 45, true)) return null;
+  try {
+    const ids = await getMatchIds(platform, puuid, { count: 10 });
+    const others = await Promise.all(
+      ids.filter((id) => id !== match.metadata.matchId).map((id) => getMatch(platform, id).catch(() => null)),
+    );
+    return tiltCheck([match, ...others.filter((m): m is Match => m !== null)], puuid, Date.now());
+  } catch {
+    return null;
+  }
 }

@@ -100,8 +100,27 @@ const secondaryButton =
 
 /* ---------- Cuenta ---------- */
 
+/** Ícono y nivel de la cuenta vinculada (se piden a Riot una vez por cuenta). */
+function useAccountIcon(account: { gameName: string; tagLine: string; platform: Platform } | null) {
+  const key = account ? `${account.platform}/${encodeURIComponent(`${account.gameName}-${account.tagLine}`)}` : null;
+  const [info, setInfo] = useState<{ key: string; icon: string | null; level: number | null } | null>(null);
+  useEffect(() => {
+    if (!key) return;
+    let cancelled = false;
+    fetch(`/api/cuenta/${key}`)
+      .then((r) => (r.ok ? r.json() : null))
+      .then((body) => !cancelled && body && setInfo({ key, icon: body.icon ?? null, level: body.level ?? null }))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [key]);
+  return info?.key === key ? info : null;
+}
+
 function AccountSection() {
   const account = useDesktopAccount();
+  const icon = useAccountIcon(account);
   const connected = useClientConnected();
   const [riotId, setRiotId] = useState("");
   const [platform, setPlatform] = useState<Platform>(usePreferredPlatform());
@@ -147,23 +166,39 @@ function AccountSection() {
       description="RiftLab toma tu cuenta del cliente de League cuando lo abres e inicias sesión: no te pide contraseña. También puedes vincularla a mano con tu Riot ID."
     >
       <div className="flex flex-wrap items-center justify-between gap-3 rounded-md border border-line bg-night/40 px-4 py-3">
-        <div className="min-w-0">
-          {account ? (
-            <>
-              <p className="font-display text-lg font-semibold">
-                {account.gameName}
-                <span className="text-dim">#{account.tagLine}</span>
-                <span className="ml-2 text-sm font-normal text-muted">{PLATFORMS[account.platform]?.label}</span>
-              </p>
-              <p className="text-xs text-muted">Cuenta vinculada</p>
-            </>
-          ) : (
-            <p className="text-muted">Sin cuenta vinculada</p>
+        <div className="flex min-w-0 items-center gap-4">
+          {account && (
+            <div className="relative shrink-0">
+              {icon?.icon ? (
+                <img src={icon.icon} alt="" width={56} height={56} className="h-14 w-14 rounded-xl ring-2 ring-gold/60" />
+              ) : (
+                <span className="block h-14 w-14 animate-pulse rounded-xl bg-raised" aria-hidden="true" />
+              )}
+              {icon?.level != null && (
+                <span className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 rounded-full border border-gold/60 bg-night px-1.5 text-[11px] leading-tight">
+                  {icon.level}
+                </span>
+              )}
+            </div>
           )}
-          <p className="mt-1 flex items-center gap-1.5 text-xs text-dim">
-            <span className={`h-2 w-2 rounded-full ${connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
-            {connected ? "Cliente de League abierto" : "Cliente de League cerrado"}
-          </p>
+          <div className="min-w-0">
+            {account ? (
+              <>
+                <p className="font-display text-lg font-semibold">
+                  {account.gameName}
+                  <span className="text-dim">#{account.tagLine}</span>
+                  <span className="ml-2 text-sm font-normal text-muted">{PLATFORMS[account.platform]?.label}</span>
+                </p>
+                <p className="text-xs text-muted">Cuenta vinculada</p>
+              </>
+            ) : (
+              <p className="text-muted">Sin cuenta vinculada</p>
+            )}
+            <p className="mt-1 flex items-center gap-1.5 text-xs text-dim">
+              <span className={`h-2 w-2 rounded-full ${connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
+              {connected ? "Cliente de League abierto" : "Cliente de League cerrado"}
+            </p>
+          </div>
         </div>
         {account && (
           <div className="flex gap-2">

@@ -90,10 +90,18 @@ export interface SummonerSpell {
 
 /* ---------- Fetch con caché ---------- */
 
-async function getJson<T>(url: string): Promise<T> {
-  const res = await fetch(url);
-  if (!res.ok) throw new Error(`Data Dragon ${res.status}: ${url}`);
-  return res.json() as Promise<T>;
+// Con reintentos: un corte de un segundo dejaba el perfil entero en error, y como el error sale de
+// una función con "use cache", en producción llegaba sin mensaje.
+async function getJson<T>(url: string, attempts = 3): Promise<T> {
+  try {
+    const res = await fetch(url, { signal: AbortSignal.timeout(10_000) });
+    if (!res.ok) throw new Error(`Data Dragon ${res.status}: ${url}`);
+    return (await res.json()) as T;
+  } catch (err) {
+    if (attempts <= 1) throw err;
+    await new Promise((r) => setTimeout(r, 1000));
+    return getJson<T>(url, attempts - 1);
+  }
 }
 
 export async function getVersions(): Promise<string[]> {

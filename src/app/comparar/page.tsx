@@ -11,7 +11,7 @@ import { headToHead, loadComparedPlayer, type ComparedPlayer } from "@/lib/compa
 import { getChampionsByKey, getLatestVersion, img, type ChampionSummary } from "@/lib/ddragon";
 import { kda } from "@/lib/format";
 import { parseString } from "@/lib/params";
-import { RiotApiError, hasRiotKey, riotIdToSlug, slugToRiotId } from "@/lib/riot";
+import { RiotApiError, errorMessage, hasRiotKey, riotIdToSlug, slugToRiotId } from "@/lib/riot";
 
 export const metadata: Metadata = { title: "Comparar jugadores" };
 
@@ -42,9 +42,7 @@ async function load(p: NonNullable<ReturnType<typeof parsePlayer>>) {
       message:
         err instanceof RiotApiError && err.status === 404
           ? `No encontramos a ${p.gameName}#${p.tagLine} en ${PLATFORMS[p.platform].label}.`
-          : err instanceof Error
-            ? err.message
-            : "Error desconocido",
+          : errorMessage(err),
     };
   }
 }

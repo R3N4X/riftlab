@@ -55,6 +55,13 @@ const limitMessage = () =>
     ? "Se alcanzó el límite de consultas que comparte el grupo (100 cada 2 minutos)."
     : "Se alcanzó el límite de consultas de la clave de Riot (100 cada 2 minutos).";
 
+/** Mensaje para mostrar de cualquier error al cargar datos de Riot o de Data Dragon. */
+export function errorMessage(err: unknown): string {
+  if (err instanceof RiotApiError) return err.message;
+  // Los errores de funciones con "use cache" llegan en producción sin su mensaje real (en inglés).
+  return "No se pudo conectar con los servidores de Riot. Suele ser un corte momentáneo de internet: se reintenta solo.";
+}
+
 export function hasRiotKey(): boolean {
   return Boolean(process.env.RIOT_API_KEY || groupProxy());
 }
@@ -81,9 +88,19 @@ export async function riotFetch<T>(host: string, path: string, retries = 3): Pro
   callsInWindow(host);
   recentCalls.get(host)!.push(Date.now());
 
-  const res = proxy
-    ? await fetch(`${proxy.url}/${host}${path}`, { headers: { "X-RiftLab-Code": proxy.code } })
-    : await fetch(`https://${host}.api.riotgames.com${path}`, { headers: { "X-Riot-Token": key! } });
+  let res: Response;
+  try {
+    res = proxy
+      ? await fetch(`${proxy.url}/${host}${path}`, { headers: { "X-RiftLab-Code": proxy.code }, signal: AbortSignal.timeout(15_000) })
+      : await fetch(`https://${host}.api.riotgames.com${path}`, { headers: { "X-Riot-Token": key! }, signal: AbortSignal.timeout(15_000) });
+  } catch {
+    // Sin conexión o sin respuesta: se reintenta una vez antes de avisar.
+    if (retries > 0) {
+      await sleep(1000);
+      return riotFetch<T>(host, path, Math.min(retries - 1, 1));
+    }
+    throw new RiotApiError(503, errorMessage(null));
+  }
 
   if (res.status === 429 && retries > 0) {
     const wait = Number(res.headers.get("retry-after") ?? "2") * 1000;

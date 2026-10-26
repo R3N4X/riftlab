@@ -12,7 +12,7 @@ import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, type Champ
 import { duration, kda } from "@/lib/format";
 import { getGameReview, type GameReview, type LaneReview, type ReviewEvent } from "@/lib/game-review";
 import { parseString } from "@/lib/params";
-import { RiotApiError, getMatch, hasRiotKey, riotIdToSlug } from "@/lib/riot";
+import { RiotApiError, errorMessage, getMatch, hasRiotKey, riotIdToSlug } from "@/lib/riot";
 
 export const metadata: Metadata = { title: "Resumen de la partida" };
 
@@ -277,7 +277,7 @@ async function loadMatch(platform: Platform, matchId: string) {
     return {
       ok: false as const,
       status: err instanceof RiotApiError ? err.status : 500,
-      message: err instanceof Error ? err.message : "Error desconocido",
+      message: errorMessage(err),
       retryAfter: err instanceof RiotApiError ? err.retryAfter : undefined,
       // Cada intento fallido reinicia la cuenta regresiva.
       failedAt: Date.now(),

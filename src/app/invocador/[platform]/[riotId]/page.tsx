@@ -23,6 +23,7 @@ import {
   getMatchIds,
   getSummonerByPuuid,
   getTopMasteries,
+  errorMessage,
   hasRiotKey,
   riotIdToSlug,
   slugToRiotId,
@@ -94,7 +95,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
               Revisa que el tag esté bien escrito y que el servidor sea el correcto.
             </ErrorNote>
           ) : (
-            <ErrorNote title={profile.status === 429 ? "Riot pidió esperar un momento" : "La API de Riot no respondió"}>
+            <ErrorNote title={profile.status === 429 ? "Riot pidió esperar un momento" : "No se pudo cargar el perfil"}>
               {profile.message}
               {profile.status === 429 && " Pasa cuando la app y el recolector de datos usan muchas consultas seguidas."}
               <AutoRetry key={profile.failedAt} seconds={profile.status === 429 ? Math.min(120, profile.retryAfter ?? 30) : 10} />
@@ -385,7 +386,7 @@ async function loadProfile(platform: Platform, gameName: string, tagLine: string
     return {
       ok: false as const,
       status: err instanceof RiotApiError ? err.status : 500,
-      message: err instanceof Error ? err.message : "Error desconocido",
+      message: errorMessage(err),
       retryAfter: err instanceof RiotApiError ? err.retryAfter : undefined,
       // Cada intento fallido reinicia la cuenta regresiva.
       failedAt: Date.now(),

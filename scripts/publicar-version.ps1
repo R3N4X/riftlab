@@ -21,6 +21,9 @@ foreach ($f in $files) {
 $previous = (& gh api user --jq .login).Trim()
 if ($previous -ne "R3N4X") { & gh auth switch --hostname github.com --user R3N4X | Out-Null }
 try {
+  # Primero el código, para que el Release quede sobre el commit de esta versión.
+  & git push origin main
+  if ($LASTEXITCODE -ne 0) { throw "No se pudo subir el código a GitHub." }
   & gh release view $tag --repo R3N4X/riftlab *> $null
   if ($LASTEXITCODE -eq 0) { throw "La versión $tag ya está publicada. Sube el número de version en package.json." }
   & gh release create $tag @files --repo R3N4X/riftlab --title "RiftLab $version" --notes "Instalador de RiftLab $version para Windows. Si ya tienes la app instalada, se actualiza sola."

@@ -130,6 +130,10 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 - `src/lib/riot.ts` cuenta las consultas de la app por host; tras un 429 bloquea ese host hasta que pase el `retry-after` (no insiste). El rango de cada jugador de las tarjetas (`src/lib/match-rank.ts`) se salta si `isRiotBusy` (≥ 45 consultas en 2 min), para no dejar sin consultas al perfil.
 - Si el perfil igual choca con el límite, el aviso hace una cuenta regresiva y se reintenta solo (`AutoRetry` en `src/components/refresh-profile.tsx`).
 
+### Página pública y clave Production
+- `docs/` es la página pública de RiftLab para GitHub Pages (`index.html`, `privacidad.html`, `estilo.css`, `capturas/` tomadas con Edge sin ventana desde el servidor compilado, `.nojekyll`). Se publica desde Settings → Pages → rama `main`, carpeta `/docs` → `https://r3n4x.github.io/riftlab/`. Lo activa el usuario.
+- `docs/clave-production-riot.md`: pasos y textos en inglés para pedir la clave Production.
+
 ### Clave personal de Riot
 - Guía para pedirla y texto sugerido para el formulario en `docs/clave-personal-riot.md`. Hay que pedirla desde la cuenta de Riot del usuario; la app ya la acepta en Ajustes (mismo formato `RGAPI-`).
 

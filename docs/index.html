@@ -1,0 +1,108 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>RiftLab</title>
+  <meta name="description" content="App de escritorio gratuita con estadísticas de League of Legends y TFT: historial con nota por partida, builds según el rival, pantalla de carga y resumen al terminar cada partida.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="envoltura">
+      <a class="marca" href="./">Rift<span>Lab</span></a>
+      <nav aria-label="Secciones">
+        <a href="#descargar">Descargar</a>
+        <a href="#api">Cómo usa la API de Riot</a>
+        <a href="#english">English</a>
+        <a href="privacidad.html">Privacidad</a>
+      </nav>
+    </div>
+  </header>
+
+  <main>
+    <section class="portada" id="descargar">
+      <div class="envoltura">
+        <h1>Entiende cada partida que juegas</h1>
+        <p>RiftLab es una app de escritorio para Windows con estadísticas de League of Legends y TFT. Te muestra tu historial con una nota por partida, la build que más gana contra tu rival, el rango de cada jugador en la pantalla de carga y un resumen con consejos al terminar. Es gratis, no tiene anuncios y no pide crear cuenta.</p>
+        <div class="acciones">
+          <a class="boton principal" href="https://github.com/R3N4X/riftlab/releases/latest">Descargar para Windows</a>
+          <a class="boton" href="https://github.com/R3N4X/riftlab">Ver el código</a>
+          <span class="nota">Windows 10 u 11 · se actualiza sola</span>
+        </div>
+        <img class="captura" src="capturas/tier-list.png" width="1400" height="875" alt="Tier list de RiftLab: campeones por rol con su winrate, pickrate y banrate del parche actual.">
+      </div>
+    </section>
+
+    <section class="funciones" aria-label="Qué hace RiftLab">
+      <div class="envoltura funcion">
+        <div>
+          <h2>Builds según contra quién juegas</h2>
+          <p>Cada campeón tiene runas, objetos, hechizos y orden de habilidades sacados de miles de partidas clasificatorias del parche. Si eliges al rival, la build cambia a la que más gana en ese enfrentamiento.</p>
+        </div>
+        <img class="captura" src="capturas/campeon.png" width="1400" height="875" loading="lazy" alt="Página de un campeón con su build recomendada, runas y winrate por enfrentamiento.">
+      </div>
+
+      <div class="envoltura funcion invertida">
+        <div>
+          <h2>Un resumen al terminar la partida</h2>
+          <p>Apenas termina la partida, RiftLab abre una nota de la S a la D con lo que salió bien y lo que no: farm, visión, muertes tempranas, objetivos y cómo se compara tu build con la más ganadora. Si la sesión viene mal, también te sugiere una pausa.</p>
+        </div>
+        <img class="captura" src="capturas/campeones.png" width="1400" height="875" loading="lazy" alt="Lista de campeones de RiftLab con su winrate en el rango elegido.">
+      </div>
+
+      <div class="envoltura funcion">
+        <div>
+          <h2>TFT también</h2>
+          <p>Composiciones del set actual con su posición promedio, objetos recomendados por campeón y una ventana flotante con las comps para tener a mano mientras juegas.</p>
+        </div>
+        <img class="captura" src="capturas/tft.png" width="1400" height="875" loading="lazy" alt="Composiciones de TFT con su posición promedio y sus campeones.">
+      </div>
+    </section>
+
+    <section class="bloque" id="api">
+      <div class="envoltura">
+        <h2>Cómo usa la API de Riot</h2>
+        <p>RiftLab solo lee datos públicos de la API oficial de Riot Games. La clave de la API nunca viaja dentro de la app: queda guardada en un servidor intermediario que responde las consultas de la app, las limita a lo que RiftLab necesita y guarda en caché las partidas terminadas para no repetir consultas.</p>
+        <div class="tabla">
+          <table>
+            <thead><tr><th>API</th><th>Para qué</th></tr></thead>
+            <tbody>
+              <tr><td><code>account-v1</code>, <code>summoner-v4</code></td><td>Buscar un jugador por su Riot ID y mostrar su ícono y nivel.</td></tr>
+              <tr><td><code>league-v4</code></td><td>Rango y LP del perfil. Las ligas de Maestro a Retador sirven para elegir de qué partidas salen las estadísticas.</td></tr>
+              <tr><td><code>champion-mastery-v4</code></td><td>Campeones con más maestría del perfil.</td></tr>
+              <tr><td><code>match-v5</code> (partidas y línea de tiempo)</td><td>Historial, resumen post-partida y las estadísticas de builds y enfrentamientos.</td></tr>
+              <tr><td><code>spectator-v5</code></td><td>Saber si el jugador está en partida y mostrar la pantalla de carga.</td></tr>
+              <tr><td><code>tft-league-v1</code>, <code>tft-match-v1</code></td><td>Estadísticas de composiciones de TFT.</td></tr>
+            </tbody>
+          </table>
+        </div>
+        <ul class="lista">
+          <li><strong>Selección de campeones:</strong> en clasificatorias no muestra quiénes son los rivales; solo lo que el cliente ya muestra al jugador. Los jugadores rivales aparecen recién cuando empieza la partida.</li>
+          <li><strong>TFT:</strong> nada cambia según la partida en curso. La ventana flotante muestra las mismas comps generales que la app.</li>
+          <li><strong>Sin ventajas indebidas:</strong> no automatiza acciones del juego, no lee la memoria del juego y no revela información oculta.</li>
+          <li><strong>Límites:</strong> la app respeta los límites de consultas, espera lo que Riot indica tras un aviso de límite y deja de pedir datos secundarios cuando quedan pocas consultas.</li>
+        </ul>
+      </div>
+    </section>
+
+    <section class="bloque" id="english" lang="en">
+      <div class="envoltura">
+        <h2>About RiftLab (English)</h2>
+        <p>RiftLab is a free Windows desktop app for League of Legends and TFT players, with no ads and no accounts. It shows a player's match history with a score for each game, champion builds aggregated from ranked matches (including the best build against a specific opponent), a loading-screen view with each player's rank once the game has started, and a post-game summary with improvement tips. The Riot API key is never shipped inside the app: it stays on a small intermediary server that only forwards the endpoints listed above, caches finished matches and respects Riot's rate limits. RiftLab does not reveal hidden information (opponents in ranked champion select are not shown), does not change during TFT games and does not automate anything in the game.</p>
+      </div>
+    </section>
+  </main>
+
+  <footer class="pie">
+    <div class="envoltura">
+      <p>RiftLab no está respaldado por Riot Games y no refleja las opiniones de Riot Games ni de nadie involucrado oficialmente en la producción o gestión de sus propiedades. Riot Games y todas las propiedades asociadas son marcas comerciales o marcas registradas de Riot Games, Inc.</p>
+      <p lang="en">RiftLab isn't endorsed by Riot Games and doesn't reflect the views or opinions of Riot Games or anyone officially involved in producing or managing Riot Games properties. Riot Games, and all associated properties are trademarks or registered trademarks of Riot Games, Inc.</p>
+      <p><a href="privacidad.html">Privacidad</a> · <a href="https://github.com/R3N4X/riftlab/issues">Contacto y reportes</a></p>
+    </div>
+  </footer>
+</body>
+</html>

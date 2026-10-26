@@ -1,0 +1,57 @@
+<!doctype html>
+<html lang="es">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Privacidad de RiftLab</title>
+  <meta name="description" content="Qué datos usa RiftLab, dónde se guardan y qué no hace con ellos.">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Barlow:wght@400;500;600&family=Barlow+Condensed:wght@600&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="estilo.css">
+</head>
+<body>
+  <header class="barra">
+    <div class="envoltura">
+      <a class="marca" href="./">Rift<span>Lab</span></a>
+      <nav aria-label="Secciones"><a href="./">Inicio</a></nav>
+    </div>
+  </header>
+  <main class="envoltura">
+    <article class="texto">
+      <h1>Privacidad</h1>
+      <p>Última actualización: 26 de octubre de 2026.</p>
+
+      <h2>Qué datos usa</h2>
+      <p>RiftLab muestra datos públicos de la API oficial de Riot Games: el Riot ID que buscas, rango, maestrías, historial y partidas. No pide nombre, correo ni contraseña, y no tiene cuentas propias.</p>
+
+      <h2>Qué se guarda en tu equipo</h2>
+      <ul>
+        <li>Tus ajustes y la cuenta que vinculas, en la carpeta de la app (<code>%APPDATA%\riftlab</code>).</li>
+        <li>Una caché de partidas y datos del juego, para no volver a pedirlos.</li>
+        <li>Si tienes el cliente de League of Legends abierto, la app lee de él tu cuenta, la selección de campeones y el estado de tus amigos. Esa información se usa solo en tu equipo y no se envía a ningún servidor de RiftLab.</li>
+      </ul>
+
+      <h2>El servidor intermediario</h2>
+      <p>Las consultas a la API de Riot pasan por un servidor en Cloudflare que guarda la clave de la API. Ese servidor no lleva registros propios de quién consulta qué; guarda en caché las partidas terminadas, que son datos públicos de Riot. Cloudflare puede registrar datos técnicos de las conexiones, como la dirección IP, según su propia política de privacidad.</p>
+
+      <h2>Estadísticas</h2>
+      <p>Las estadísticas de campeones, builds y composiciones salen de partidas clasificatorias públicas y se publican agregadas: no muestran a qué jugador corresponde cada partida.</p>
+
+      <h2>Qué no hace</h2>
+      <ul>
+        <li>No tiene anuncios ni rastreadores, y no vende ni comparte datos con terceros.</li>
+        <li>No lee la memoria del juego ni automatiza acciones.</li>
+      </ul>
+
+      <h2>Contacto</h2>
+      <p>Para preguntas o para pedir que se quite algo, abre un reporte en <a href="https://github.com/R3N4X/riftlab/issues">github.com/R3N4X/riftlab/issues</a>.</p>
+    </article>
+  </main>
+  <footer class="pie">
+    <div class="envoltura">
+      <p>RiftLab no está respaldado por Riot Games y no refleja las opiniones de Riot Games ni de nadie involucrado oficialmente en la producción o gestión de sus propiedades. Riot Games y todas las propiedades asociadas son marcas comerciales o marcas registradas de Riot Games, Inc.</p>
+    </div>
+  </footer>
+</body>
+</html>

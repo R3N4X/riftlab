@@ -108,8 +108,8 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 
 ### Recolector automático
 - `scripts/recolector.ps1`: ciclo sin fin (LoL en cada vuelta, TFT cada 4, 5 min de pausa entre vueltas), una sola copia (mutex), registro en `%LOCALAPPDATA%\riftlab\recolector.log` (rota a los 5 MB).
-- Arranca solo al iniciar sesión en Windows con el acceso directo `RiftLab recolector.lnk` de la carpeta Inicio (PowerShell oculto). No depende de la app ni de Claude.
-- Para detenerlo: cerrar los procesos node del recolector (o el powershell de `recolector.ps1`); para que no arranque más, borrar ese acceso directo.
+- Arranca solo con la tarea programada "RiftLab recolector" (al iniciar sesión, con 1 minuto de espera; PowerShell oculto). No depende de la app ni de Claude. Para detenerlo o que no arranque más: finalizar o deshabilitar esa tarea en el Programador de tareas.
+- Ojo: la app de Claude es un paquete de Windows y todo lo que se lanza desde Claude ve una copia propia de `%APPDATA%` y `%LOCALAPPDATA%` (en `AppData\Local\Packages\Claude_…\LocalCache`). Por eso el registro que se ve desde Claude no es el real, y la clave pegada en Ajustes desde una app abierta por Claude no la ve el recolector de la tarea. La clave personal quedó también en `.env.local` (carpeta del proyecto, que no se duplica): ahí la leen todos.
 - Ya no hace falta lanzar `npm run aggregate` a mano. Si se lanza a mano mientras corre el ciclo, se duplican las consultas.
 
 ### Límite de la API (100 consultas cada 2 min, compartido con el agregador)

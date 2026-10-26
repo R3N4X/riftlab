@@ -1,17 +1,22 @@
 # Recolector de RiftLab en ciclo: junta partidas de LoL sin parar y, cada 4 vueltas, comps de TFT.
-# Lo arranca Windows al iniciar sesión (acceso directo "RiftLab recolector" en la carpeta Inicio)
-# y corre oculto, sin depender de la app ni de ninguna terminal.
+# Lo arranca el Programador de tareas de Windows un minuto después de iniciar sesión (tarea
+# "RiftLab recolector") y corre oculto, sin depender de la app ni de ninguna terminal.
 # Avance: %LOCALAPPDATA%\riftlab\recolector.log
-# Para detenerlo: cerrar los procesos "node" del recolector o borrar el acceso directo y reiniciar.
+# Para detenerlo: finalizar la tarea en el Programador de tareas; para que no arranque más, deshabilitarla.
 
 $root = Split-Path -Parent $PSScriptRoot
 $logDir = Join-Path $env:LOCALAPPDATA "riftlab"
 New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $log = Join-Path $logDir "recolector.log"
 
+Add-Content -Path $log -Value "Recolector iniciado (proceso $PID), $(Get-Date -Format 'yyyy-MM-dd HH:mm')" -Encoding UTF8
+
 # Una sola copia a la vez (por si se abre dos veces).
 $mutex = New-Object System.Threading.Mutex($false, "Local\RiftLabRecolector")
-if (-not $mutex.WaitOne(0)) { exit }
+if (-not $mutex.WaitOne(0)) {
+  Add-Content -Path $log -Value "Ya hay otra copia corriendo: esta se cierra." -Encoding UTF8
+  exit
+}
 
 Set-Location $root
 $tsx = Join-Path $root "node_modules\.bin\tsx.cmd"

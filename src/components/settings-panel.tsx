@@ -419,7 +419,7 @@ function UpdatesSection() {
   return (
     <SettingsCard
       title="Actualizaciones"
-      description="La app instalada busca una versión nueva al abrirse y cada 6 horas, la descarga sola y la instala al cerrarse. Para compartirla con tus amigos, todos usan la misma dirección de actualizaciones."
+      description="La app instalada busca una versión nueva al abrirse y cada 6 horas, la descarga sola y la instala al cerrarse. Las versiones se publican en GitHub (R3N4X/riftlab)."
     >
       <p
         role="status"
@@ -429,6 +429,7 @@ function UpdatesSection() {
         {progress}
         {status.version && status.state !== "none" && <> Versión {status.version}.</>}
         {status.message && <span className="block text-xs text-dim">{status.message}</span>}
+        {status.state !== "disabled" && <span className="block text-xs text-dim">Origen: {status.url ?? "GitHub, R3N4X/riftlab"}</span>}
       </p>
       {status.state !== "disabled" && (
         <form
@@ -446,7 +447,7 @@ function UpdatesSection() {
             id="ajustes-actualizaciones"
             value={field}
             onChange={(e) => setUrl(e.target.value)}
-            placeholder="https://… (carpeta con latest.yml)"
+            placeholder="Dirección propia (opcional): https://… con latest.yml"
             spellCheck={false}
             className={`${fieldClass} min-w-64 flex-1`}
           />
@@ -455,7 +456,7 @@ function UpdatesSection() {
           </button>
           <button
             type="button"
-            disabled={!status.url || status.state === "checking" || status.state === "downloading"}
+            disabled={status.state === "checking" || status.state === "downloading"}
             onClick={() => void window.riftlab!.checkForUpdates().then(setStatus)}
             className={secondaryButton}
           >

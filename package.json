@@ -1,6 +1,6 @@
 {
   "name": "riftlab",
-  "version": "0.1.0",
+  "version": "0.2.0",
   "private": true,
   "main": "desktop/dist/main.cjs",
   "scripts": {
@@ -16,7 +16,8 @@
     "aggregate:tft": "tsx scripts/aggregate-tft.ts",
     "sync:positions": "tsx scripts/sync-positions.ts",
     "typecheck": "tsc --noEmit",
-    "dist": "npm run desktop:build && tsx scripts/stage-installer.ts && electron-builder --win nsis --publish never"
+    "dist": "npm run desktop:build && tsx scripts/stage-installer.ts && electron-builder --win nsis --publish never",
+    "release": "npm run dist && powershell -NoProfile -ExecutionPolicy Bypass -File scripts/publicar-version.ps1"
   },
   "dependencies": {
     "cheerio": "^1.2.0",
@@ -68,8 +69,7 @@
         "filter": [
           "meta.json",
           "tft-meta.json",
-          "patches/*.json",
-          "players/*.json"
+          "patches/*.json"
         ]
       },
       {
@@ -92,8 +92,10 @@
     },
     "publish": [
       {
-        "provider": "generic",
-        "url": "https://riftlab.invalid/actualizaciones"
+        "provider": "github",
+        "owner": "R3N4X",
+        "repo": "riftlab",
+        "releaseType": "release"
       }
     ]
   }

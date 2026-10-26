@@ -528,8 +528,9 @@ ipcMain.handle("live:set-spells", (_e, spell1Id: number, spell2Id: number) => le
 
 /* ---------- Actualizaciones automáticas ---------- */
 
-// Solo la app instalada se actualiza sola: baja latest.yml de la dirección configurada,
-// descarga el instalador nuevo en segundo plano y lo aplica al cerrar (o al pedirlo).
+// Solo la app instalada se actualiza sola: baja latest.yml de los Releases de GitHub
+// (R3N4X/riftlab, viene en app-update.yml dentro del instalador) o de una dirección propia
+// configurada en Ajustes, descarga el instalador nuevo en segundo plano y lo aplica al cerrar.
 let update: UpdateStatus = {
   state: app.isPackaged ? "idle" : "disabled",
   url: readSettings().updateUrl ?? process.env.RIFTLAB_UPDATE_URL ?? null,
@@ -552,8 +553,10 @@ const firstLine = (text: string) => text.split(/\r?\n/)[0];
 autoUpdater.on("error", (err) => setUpdate({ state: "error", message: firstLine(err.message) }));
 
 function checkUpdates(): UpdateStatus {
-  if (!app.isPackaged || !update.url) return update;
-  autoUpdater.setFeedURL({ provider: "generic", url: update.url });
+  if (!app.isPackaged) return update;
+  // Sin dirección propia se usa la del instalador (GitHub).
+  if (update.url) autoUpdater.setFeedURL({ provider: "generic", url: update.url });
+  else autoUpdater.setFeedURL({ provider: "github", owner: "R3N4X", repo: "riftlab" });
   void autoUpdater.checkForUpdates().catch((err: Error) => setUpdate({ state: "error", message: firstLine(err.message) }));
   return update;
 }

@@ -29,6 +29,28 @@ export function duration(seconds: number): string {
   return `${m}:${String(s).padStart(2, "0")}`;
 }
 
+/**
+ * Ancho aproximado de un nombre en "letras latinas": los caracteres de ancho completo (japonés,
+ * chino, coreano, símbolos como 〆) ocupan el doble que una letra de la fuente condensada.
+ */
+export function nameWidth(name: string): number {
+  let width = 0;
+  for (const ch of name) {
+    const c = ch.codePointAt(0) ?? 0;
+    const wide =
+      (c >= 0x1100 && c <= 0x115f) ||
+      (c >= 0x2e80 && c <= 0xa4cf) ||
+      (c >= 0xac00 && c <= 0xd7a3) ||
+      (c >= 0xf900 && c <= 0xfaff) ||
+      (c >= 0xfe30 && c <= 0xfe4f) ||
+      (c >= 0xff00 && c <= 0xff60) ||
+      (c >= 0xffe0 && c <= 0xffe6) ||
+      c >= 0x1f300;
+    width += wide ? 2 : 1;
+  }
+  return width;
+}
+
 export function timeAgo(timestamp: number, now: number): string {
   const diff = Math.max(0, now - timestamp) / 1000;
   if (diff < 3600) return `hace ${Math.max(1, Math.round(diff / 60))} min`;

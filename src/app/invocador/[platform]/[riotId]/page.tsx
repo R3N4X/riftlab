@@ -12,7 +12,7 @@ import { ErrorNote, Panel, Section, Skeleton } from "@/components/ui";
 import { PLATFORMS, QUEUES, ROLE_LABEL, ROLES, TIER_LABEL, isPlatform, type Platform, type Role, type Tier } from "@/lib/constants";
 import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, getSummonerSpells, img } from "@/lib/ddragon";
 import { rememberPlayers } from "@/lib/players";
-import { kda, pct, timeAgo, wrClass } from "@/lib/format";
+import { kda, nameWidth, pct, timeAgo, wrClass } from "@/lib/format";
 import { parseString } from "@/lib/params";
 import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
@@ -135,10 +135,10 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
               {summoner.summonerLevel}
             </span>
           </div>
-          <div className="shrink-0">
-            <h1 className="font-display text-5xl font-bold tracking-tight">
+          <div className="min-w-0 shrink-0 md:max-w-md">
+            <h1 className={`break-words font-display font-bold tracking-tight ${nameSize(account.gameName)}`}>
               {account.gameName}
-              <span className="text-3xl text-dim">#{account.tagLine}</span>
+              <span className="whitespace-nowrap text-[0.6em] text-dim">#{account.tagLine}</span>
             </h1>
             <p className="mt-1 text-muted">
               {PLATFORMS[platform].label}
@@ -346,6 +346,15 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
       </>
     );
   }
+}
+
+/** Los nombres con muchos caracteres anchos se achican para no aplastar el resto del encabezado. */
+function nameSize(name: string): string {
+  const width = nameWidth(name);
+  if (width <= 16) return "text-5xl";
+  if (width <= 22) return "text-4xl";
+  if (width <= 30) return "text-3xl";
+  return "text-2xl";
 }
 
 async function loadProfile(platform: Platform, gameName: string, tagLine: string, count: number, queue?: number) {

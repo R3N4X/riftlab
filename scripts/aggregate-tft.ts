@@ -125,6 +125,8 @@ function mainTrait(traits: Trait[]): Trait | null {
 
 async function main() {
   loadEnv();
+  // Riot registra cada clave para un juego: la de LoL responde 403 en las APIs de TFT.
+  if (process.env.RIOT_TFT_API_KEY) process.env.RIOT_API_KEY = process.env.RIOT_TFT_API_KEY;
   if (!process.env.RIOT_API_KEY) {
     console.error("Falta RIOT_API_KEY. Crea .env.local con RIOT_API_KEY=RGAPI-... (https://developer.riotgames.com)");
     process.exit(1);
@@ -138,6 +140,20 @@ async function main() {
   setRateLimits((host) =>
     reservedHosts.has(host) ? opts.rate.map((l) => ({ ...l, limit: Math.max(1, Math.floor(l.limit * 0.3)) })) : opts.rate,
   );
+
+  // Sin acceso a TFT, cada consulta devolvía nada y el recolector terminaba "listo" sin juntar partidas.
+  const probe = await fetch(`https://${opts.platforms[0]}.api.riotgames.com/tft/league/v1/challenger?queue=RANKED_TFT`, {
+    headers: { "X-Riot-Token": process.env.RIOT_API_KEY! },
+  });
+  if (probe.status === 401 || probe.status === 403) {
+    console.error(
+      "La clave de Riot no tiene acceso a las APIs de TFT (cada clave se registra para un juego). " +
+        "Registra un producto con Game Focus Teamfight Tactics en developer.riotgames.com y pon su clave en .env.local como RIOT_TFT_API_KEY.",
+    );
+    // exitCode y no exit(): cortar con la conexión de la prueba abierta hacía fallar a node en Windows.
+    process.exitCode = 2;
+    return;
+  }
 
   const versions = (await (await fetch("https://ddragon.leagueoflegends.com/api/versions.json")).json()) as string[];
   const [major, minor] = versions[0].split(".").map(Number);

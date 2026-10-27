@@ -65,3 +65,6 @@ next-env.d.ts
 # resultados locales del QA automático (no se publican)
 /qa/
 /.playwright-mcp/
+
+# registro del recolector automático
+/logs/

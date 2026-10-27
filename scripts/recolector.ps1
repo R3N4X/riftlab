@@ -11,23 +11,48 @@ New-Item -ItemType Directory -Force -Path $logDir | Out-Null
 $log = Join-Path $logDir "recolector.log"
 $tftMeta = Join-Path $root "data\tft-meta.json"
 
+# Mientras un paso corre, cmd tiene el registro abierto sin compartir la escritura: si en ese momento
+# no se puede escribir, la línea se descarta en silencio en vez de llenar la consola de errores.
 function Write-Log([string]$text) {
-  Add-Content -Path $log -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $text" -Encoding UTF8
+  for ($i = 0; $i -lt 3; $i++) {
+    try {
+      Add-Content -Path $log -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') $text" -Encoding UTF8 -ErrorAction Stop
+      return
+    } catch { Start-Sleep -Seconds 1 }
+  }
+}
+
+# Pasos de node que siguen vivos aunque el recolector que los lanzó se haya cerrado.
+function Get-OrphanSteps {
+  Get-CimInstance Win32_Process -Filter "Name = 'node.exe'" -ErrorAction SilentlyContinue |
+    Where-Object { $_.CommandLine -like "*scripts\aggregate*" }
 }
 
 Write-Log "Recolector iniciado (proceso $PID)."
 
 # Una sola copia a la vez: el disparador de cada hora choca con la copia que ya corre.
+# Si la copia anterior se cerró de golpe, el mutex queda "abandonado": WaitOne lanza una excepción
+# pero igual lo entrega a esta copia.
 $mutex = New-Object System.Threading.Mutex($false, "Local\RiftLabRecolector")
-if (-not $mutex.WaitOne(0)) {
+try { $owned = $mutex.WaitOne(0) } catch [System.Threading.AbandonedMutexException] { $owned = $true }
+if (-not $owned) {
   Write-Log "Ya hay otra copia corriendo: esta se cierra."
   exit
+}
+
+# Si la copia anterior dejó un paso corriendo, se espera a que termine: lanzar otro en paralelo
+# duplicaría las consultas a Riot y el registro seguiría bloqueado.
+if (Get-OrphanSteps) {
+  while (Get-OrphanSteps) { Start-Sleep -Seconds 60 }
+  Write-Log "Había un paso de una copia anterior todavía corriendo; se esperó a que terminara."
 }
 
 # Un Ctrl+C enviado a la consola oculta cortaba el ciclo entero (código 0xC000013A).
 try { [Console]::TreatControlCAsInput = $true } catch { }
 Register-EngineEvent PowerShell.Exiting -MessageData $log -Action {
-  Add-Content -Path $Event.MessageData -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') Recolector detenido." -Encoding UTF8
+  try {
+    Add-Content -Path $Event.MessageData -Value "$(Get-Date -Format 'yyyy-MM-dd HH:mm:ss') Recolector detenido." -Encoding UTF8 -ErrorAction Stop
+  } catch { }
 } | Out-Null
 
 Set-Location $root

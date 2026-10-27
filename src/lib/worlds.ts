@@ -8,28 +8,36 @@
 export type Region = "LCK" | "LPL" | "LEC" | "LCS" | "LCP" | "CBLOL";
 
 export const TEAMS = {
-  GEN: { name: "Gen.G", region: "LCK" },
-  HLE: { name: "Hanwha Life Esports", region: "LCK" },
-  T1: { name: "T1", region: "LCK" },
-  DK: { name: "Dplus KIA", region: "LCK" },
-  AL: { name: "Anyone's Legend", region: "LPL" },
-  BLG: { name: "Bilibili Gaming", region: "LPL" },
-  TES: { name: "Top Esports", region: "LPL" },
-  IG: { name: "Invictus Gaming", region: "LPL" },
-  G2: { name: "G2 Esports", region: "LEC" },
-  MKOI: { name: "Movistar KOI", region: "LEC" },
-  KC: { name: "Karmine Corp", region: "LEC" },
-  TL: { name: "Team Liquid", region: "LCS" },
-  LYON: { name: "LYON", region: "LCS" },
-  C9: { name: "Cloud9", region: "LCS" },
-  TSW: { name: "Team Secret Whales", region: "LCP" },
-  CFO: { name: "CTBC Flying Oyster", region: "LCP" },
-  MVK: { name: "MVK Esports", region: "LCP" },
-  LOS: { name: "Los Grandes", region: "CBLOL" },
-  FUR: { name: "FURIA", region: "CBLOL" },
-} satisfies Record<string, { name: string; region: Region }>;
+  GEN: { name: "Gen.G", region: "LCK", logo: "1773829250929_GENGLOGO_GOLD.png" },
+  HLE: { name: "Hanwha Life Esports", region: "LCK", logo: "1631819564399_hle-2021-worlds.png" },
+  T1: { name: "T1", region: "LCK", logo: "1726801573959_539px-T1_2019_full_allmode.png" },
+  DK: { name: "Dplus KIA", region: "LCK", logo: "1673260049703_DPlusKIALOGO11.png" },
+  AL: { name: "Anyone's Legend", region: "LPL", logo: "1641199582689_.png" },
+  BLG: { name: "Bilibili Gaming", region: "LPL", logo: "1682322954525_Bilibili_Gaming_logo_20211.png" },
+  TES: { name: "Top Esports", region: "LPL", logo: "1592592064571_TopEsportsTES-01-FullonDark.png" },
+  IG: { name: "Invictus Gaming", region: "LPL", logo: "1634762917340_300px-Invictus_Gaming_logo.png" },
+  G2: { name: "G2 Esports", region: "LEC", logo: "G2-FullonDark.png" },
+  MKOI: { name: "Movistar KOI", region: "LEC", logo: "1734012609283_MKOI_FullColor_Blue.png" },
+  KC: { name: "Karmine Corp", region: "LEC", logo: "1704714951336_KC.png" },
+  TL: { name: "Team Liquid", region: "LCS", logo: "1769357207762_TLAlienware_Minimal_Bug-White.png" },
+  LYON: { name: "LYON", region: "LCS", logo: "1743717443673_isotypelyon-03.png" },
+  C9: { name: "Cloud9", region: "LCS", logo: "1736924120254_C9Kia_IconBlue_Transparent_2000x2000.png" },
+  TSW: { name: "Team Secret Whales", region: "LCP", logo: "1774598000328_White_EyeText_600p.png" },
+  CFO: { name: "CTBC Flying Oyster", region: "LCP", logo: "1656307849320_CFO_Logo.png" },
+  MVK: { name: "MVK Esports", region: "LCP", logo: "1767089709161_White_Logo.png" },
+  LOS: { name: "Los Grandes", region: "CBLOL", logo: "1784013312149_LOS-OLaranja.png" },
+  FUR: { name: "FURIA", region: "CBLOL", logo: "FURIA---black.png" },
+} satisfies Record<string, { name: string; region: Region; logo: string }>;
 
 export type TeamCode = keyof typeof TEAMS;
+
+/*
+ * Logos del CDN de lolesports (los mismos que usa su sitio), pasados por su servicio de
+ * redimensionado para no bajar imágenes de 2000 px. No se guardan en el repositorio.
+ */
+export function teamLogo(code: TeamCode, size = 64): string {
+  return `https://am-a.akamaihd.net/image?resize=${size}:&f=${encodeURIComponent(`http://static.lolesports.com/teams/${TEAMS[code].logo}`)}`;
+}
 
 export type StageId = "playin" | "swiss" | "cuartos" | "semis" | "final";
 
@@ -149,6 +157,30 @@ export function swissStandings(): SwissRecord[] {
     }
   }
   return [...table.values()];
+}
+
+/** Récord con el que cada equipo llega a cada serie de la fase suiza ("1-0", "2-2"...). */
+export function swissPools(): Map<WorldsMatch, string> {
+  const record = new Map<TeamCode, [number, number]>();
+  const pools = new Map<WorldsMatch, string>();
+  const swiss = MATCHES.filter((m) => m.stage === "swiss").sort((x, y) => Date.parse(x.start) - Date.parse(y.start));
+  for (const match of swiss) {
+    const [a, b] = match.teams;
+    if (!a || !b) {
+      // Sin rivales todavía: la ronda 5 siempre es entre equipos 2-2.
+      pools.set(match, match.round === "Ronda 5" ? "2-2" : "");
+      continue;
+    }
+    const [w, l] = record.get(a) ?? [0, 0];
+    pools.set(match, `${w}-${l}`);
+    if (!match.score) continue;
+    const winner = match.score[0] > match.score[1] ? a : b;
+    for (const team of [a, b]) {
+      const [tw, tl] = record.get(team) ?? [0, 0];
+      record.set(team, team === winner ? [tw + 1, tl] : [tw, tl + 1]);
+    }
+  }
+  return pools;
 }
 
 export function worldsRunning(now = Date.now()): boolean {

@@ -121,6 +121,7 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 
 ### Calendario de Worlds 2026 (temporal)
 - Desde la 0.2.4: página `/worlds` con próxima serie, etapas, tabla de la fase suiza y partidas por día en la hora local. Botón "Worlds" junto a la versión en la barra lateral, que se oculta solo desde el 15-11-2026 (`WORLDS_END`).
+- Cuadros por etapa (pestañas Play-In, Fase suiza y Eliminatorias): la fase suiza agrupa las series por récord (se calcula solo con `swissPools`) y muestra los equipos 3-x y x-3; las eliminatorias van en llave con líneas. Logos desde el CDN de lolesports (`teamLogo`), no se guardan en el repositorio.
 - Los datos están a mano en `src/lib/worlds.ts` (horas en UTC): la API de Riot no trae esports y la de lolesports usa una clave ajena (el modo automático la bloquea). Hay que cargar los resultados y los cruces de cuartos después de cada jornada y actualizar `SCHEDULE_UPDATED`. Cuando termine el torneo se puede borrar la página, el componente y el botón.
 
 ### Recolector automático

@@ -64,7 +64,8 @@ export function RunePage({ runeKey, trees }: { runeKey: string; trees: RuneTree[
   return (
     // Se adapta al ancho de la tarjeta (no de la pantalla): en la columna de En vivo no entraban las tres columnas.
     <div className="@container">
-      <div className="grid grid-cols-2 gap-x-4 gap-y-5 @2xl:grid-cols-[1fr_1fr_auto] @2xl:gap-6">
+      {/* Una columna en tarjetas angostas (celular): las cuatro runas clave no entraban en media tarjeta. */}
+      <div className="grid grid-cols-1 gap-x-4 gap-y-5 @sm:grid-cols-2 @2xl:grid-cols-[1fr_1fr_auto] @2xl:gap-6">
         <div>
           <p className="mb-3 flex items-center gap-2 font-display text-lg font-semibold">
             <RuneIcon icon={primary.icon} size={22} />
@@ -95,7 +96,7 @@ export function RunePage({ runeKey, trees }: { runeKey: string; trees: RuneTree[
             ))}
           </div>
         </div>
-        <div className="col-span-2 @2xl:col-span-1">
+        <div className="@sm:col-span-2 @2xl:col-span-1">
           <p className="mb-3 font-display text-lg font-semibold">Fragmentos</p>
           <div className="flex flex-wrap gap-x-5 gap-y-2 @2xl:block @2xl:space-y-2">
             {SHARD_ROWS.map((row, i) => (
@@ -116,9 +117,9 @@ export function RunePage({ runeKey, trees }: { runeKey: string; trees: RuneTree[
 
 export function StatLine({ stat }: { stat: Stat }) {
   return (
-    <div className="ml-auto flex shrink-0 gap-4 text-right text-sm">
-      <span className={`w-14 ${wrClass(stat.winRate)}`}>{pct(stat.winRate)}</span>
-      <span className="w-20 text-muted">{pct(stat.share)} uso</span>
+    <div className="ml-auto flex shrink-0 gap-3 text-right text-sm sm:gap-4">
+      <span className={`sm:w-14 ${wrClass(stat.winRate)}`}>{pct(stat.winRate)}</span>
+      <span className="text-muted sm:w-20">{pct(stat.share)} uso</span>
     </div>
   );
 }

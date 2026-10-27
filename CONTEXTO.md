@@ -130,6 +130,10 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 - `src/lib/riot.ts` cuenta las consultas de la app por host; tras un 429 bloquea ese host hasta que pase el `retry-after` (no insiste). El rango de cada jugador de las tarjetas (`src/lib/match-rank.ts`) se salta si `isRiotBusy` (≥ 45 consultas en 2 min), para no dejar sin consultas al perfil.
 - Si el perfil igual choca con el límite, el aviso hace una cuenta regresiva y se reintenta solo (`AutoRetry` en `src/components/refresh-profile.tsx`).
 
+### Revisión de políticas de Riot y QA (26-10-2026)
+- Políticas aplicadas: aviso legal con el texto exacto (`LEGAL_NOTICE_EN`/`LEGAL_NOTICE_ES` en `src/lib/constants.ts`; inglés en la barra lateral, ambos en Ajustes), importación automática de la build apagada por defecto (ajuste `autoImport`; Riot no aprueba apps que decidan por el jugador) y uso del cliente (LCU) declarado en la página y en la solicitud. Ya cumplía: clave fuera del cliente, sin rivales en la selección de clasificatorias, sin winrates de aumentos ni Arena, sin historial de personalizadas.
+- QA automático con el proyecto local de QA (resultados en `qa/`, ignorado por git): 38 casos, 31 pasaron. Corregido: página 404 y de error en español (`src/app/not-found.tsx`, `src/app/error.tsx`) y desborde a 375 px en la página del campeón (runas en una columna en tarjetas angostas). Se dejaron a propósito los términos de jugador "Tier list", "Winrate", "Pick", "Ban", "Build" y "Counters".
+
 ### Página pública y clave Production
 - `docs/` es la página pública de RiftLab para GitHub Pages (`index.html`, `privacidad.html`, `estilo.css`, `capturas/` tomadas con Edge sin ventana desde el servidor compilado, `.nojekyll`). Se publica desde Settings → Pages → rama `main`, carpeta `/docs` → `https://r3n4x.github.io/riftlab/`. Lo activa el usuario.
 - `docs/clave-production-riot.md`: pasos y textos en inglés para pedir la clave Production.

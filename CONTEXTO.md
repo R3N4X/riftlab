@@ -137,6 +137,7 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 ### Página pública y clave Production
 - `docs/` es la página pública de RiftLab para GitHub Pages (`index.html`, `privacidad.html`, `estilo.css`, `capturas/` tomadas con Edge sin ventana desde el servidor compilado, `.nojekyll`). Se publica desde Settings → Pages → rama `main`, carpeta `/docs` → `https://r3n4x.github.io/riftlab/`. Lo activa el usuario.
 - `docs/clave-production-riot.md`: pasos y textos en inglés para pedir la clave Production.
+- Solicitud Production enviada el 27-10-2026: App ID 897929, Game Focus League of Legends, URL verificada con `docs/riot.txt` (no borrarlo). Estado: Pending Review. Falta registrar otro producto con Game Focus TFT. Al aprobarse: nueva clave en `.env.local` + `scripts\desplegar-intermediario.ps1`, y subir el ritmo del recolector (hoy calibrado para 100 consultas cada 2 min).
 
 ### Clave personal de Riot
 - Guía para pedirla y texto sugerido para el formulario en `docs/clave-personal-riot.md`. Hay que pedirla desde la cuenta de Riot del usuario; la app ya la acepta en Ajustes (mismo formato `RGAPI-`).

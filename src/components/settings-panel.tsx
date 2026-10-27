@@ -3,9 +3,19 @@
 import Link from "next/link";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { LEGAL_NOTICE_EN, LEGAL_NOTICE_ES, PLATFORMS, type Platform } from "@/lib/constants";
-import { profilePath, type ActionResult, type DesktopSettings, type UpdateStatus } from "@/lib/live";
+import { profilePath, type ActionResult, type AutoImportParts, type DesktopSettings, type UpdateStatus } from "@/lib/live";
 import { setPreferredPlatform, usePreferredPlatform } from "@/lib/preferences";
-import { useDesktopAccount } from "./live-client";
+import { updateDesktopSettings, useDesktopAccount, useDesktopSettings } from "./live-client";
+import {
+  ChoiceGroup,
+  FLASH_CHOICES,
+  FlashKeys,
+  GAME_CHOICES,
+  Toggle,
+  fieldClass,
+  primaryButton,
+  secondaryButton,
+} from "./settings-controls";
 
 const noop = () => () => {};
 
@@ -31,11 +41,7 @@ function useClientConnected() {
 
 export function SettingsPanel({ patch }: { patch: string }) {
   const isDesktop = useIsDesktop();
-  const [settings, setSettings] = useState<DesktopSettings | null>(null);
-
-  useEffect(() => {
-    if (isDesktop) void window.riftlab?.getSettings().then(setSettings);
-  }, [isDesktop]);
+  const settings = useDesktopSettings();
 
   return (
     <div className="grid max-w-4xl gap-4">
@@ -48,7 +54,9 @@ export function SettingsPanel({ patch }: { patch: string }) {
 
       {isDesktop && <AccountSection />}
       <SearchSection />
-      {isDesktop && settings && <StartupSection settings={settings} onChange={setSettings} />}
+      {isDesktop && settings && <GamesSection settings={settings} />}
+      {isDesktop && settings && <ChampSelectSection settings={settings} />}
+      {isDesktop && settings && <StartupSection settings={settings} />}
       {isDesktop && settings && <ApiKeySection settings={settings} />}
       {isDesktop && <UpdatesSection />}
 
@@ -92,12 +100,6 @@ function Feedback({ result }: { result: ActionResult | null }) {
   );
 }
 
-const fieldClass =
-  "h-10 rounded-md border border-line bg-night/80 px-3 text-sm text-ink outline-none placeholder:text-dim focus:border-gold";
-const primaryButton =
-  "h-10 rounded-md bg-gold px-4 font-display font-semibold text-night transition-colors hover:bg-gold-soft disabled:cursor-not-allowed disabled:opacity-60";
-const secondaryButton =
-  "h-10 rounded-md border border-line px-4 text-sm text-ink transition-colors hover:bg-raised/60 disabled:cursor-not-allowed disabled:opacity-60";
 
 /* ---------- Cuenta ---------- */
 
@@ -278,51 +280,103 @@ function SearchSection() {
   );
 }
 
-/* ---------- Inicio ---------- */
+/* ---------- Juegos ---------- */
 
-function StartupSection({ settings, onChange }: { settings: DesktopSettings; onChange: (s: DesktopSettings) => void }) {
-  const update = async (patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport">>) =>
-    onChange(await window.riftlab!.setSettings(patch));
+function GamesSection({ settings }: { settings: DesktopSettings }) {
   return (
-    <SettingsCard title="Al iniciar">
-      <div className="space-y-3">
-        <Toggle label="Abrir RiftLab al iniciar Windows" checked={settings.openAtLogin} onChange={(v) => void update({ openAtLogin: v })} />
-        <Toggle
-          label="Abrir directo en mi perfil"
-          hint="Si está apagado, la app abre en el inicio."
-          checked={settings.openOnProfile}
-          onChange={(v) => void update({ openOnProfile: v })}
-        />
-        <Toggle
-          label="Ventana flotante en partidas de TFT"
-          hint="Se abre encima del juego con tus comps fijadas y las recetas. Ctrl + Shift + T la muestra u oculta."
-          checked={settings.tftOverlay}
-          onChange={(v) => void update({ tftOverlay: v })}
-        />
+    <SettingsCard title="Juegos" description="Lo que ves en la barra lateral según lo que juegas.">
+      <ChoiceGroup
+        name="ajustes-juegos"
+        legend="Juegos"
+        value={settings.games}
+        options={GAME_CHOICES}
+        onChange={(games) => void updateDesktopSettings({ games })}
+      />
+      <button type="button" onClick={() => void updateDesktopSettings({ setupDone: false })} className={`${secondaryButton} mt-4`}>
+        Repetir la configuración inicial
+      </button>
+    </SettingsCard>
+  );
+}
+
+/* ---------- Selección de campeones ---------- */
+
+const PART_LABEL: Record<keyof AutoImportParts, string> = { runes: "Runas", spells: "Hechizos", items: "Set de objetos" };
+
+function ChampSelectSection({ settings }: { settings: DesktopSettings }) {
+  const parts = settings.autoImportParts;
+  return (
+    <SettingsCard
+      title="Selección de campeones"
+      description="Cómo pone RiftLab tus hechizos y qué importa sola cuando bloqueas el campeón."
+    >
+      <p className="mb-2 text-sm text-muted">Tecla de Destello</p>
+      <ChoiceGroup
+        name="ajustes-destello"
+        legend="Tecla de Destello"
+        value={settings.flashKey ?? "cliente"}
+        options={[
+          ...FLASH_CHOICES,
+          {
+            value: "cliente",
+            label: "Donde ya lo tengo",
+            hint: "Respeta la tecla que tengas en el cliente en cada partida.",
+            art: <FlashKeys flashOn={null} />,
+          },
+        ]}
+        onChange={(v) => void updateDesktopSettings({ flashKey: v === "cliente" ? null : v })}
+      />
+
+      <div className="mt-5 space-y-3 border-t border-line pt-4">
         <Toggle
           label="Importar la build sola al bloquear el campeón"
-          hint="Runas, hechizos y objetos de la build Top 1 sin tocar nada. Apagado, se importan solo con los botones de En vivo."
+          hint="Usa la build Top 1 contra tu rival. Apagado, se importa solo con los botones de En vivo."
           checked={settings.autoImport}
-          onChange={(v) => void update({ autoImport: v })}
+          onChange={(autoImport) => void updateDesktopSettings({ autoImport })}
         />
+        <div className="space-y-2 border-l border-line pl-4">
+          {(Object.keys(PART_LABEL) as (keyof AutoImportParts)[]).map((k) => (
+            <Toggle
+              key={k}
+              label={PART_LABEL[k]}
+              checked={parts[k]}
+              disabled={!settings.autoImport}
+              onChange={(v) => void updateDesktopSettings({ autoImportParts: { ...parts, [k]: v } })}
+            />
+          ))}
+        </div>
       </div>
     </SettingsCard>
   );
 }
 
-function Toggle({ label, hint, checked, onChange }: { label: string; hint?: string; checked: boolean; onChange: (v: boolean) => void }) {
+/* ---------- Inicio ---------- */
+
+function StartupSection({ settings }: { settings: DesktopSettings }) {
   return (
-    <label className="flex cursor-pointer items-center justify-between gap-4">
-      <span>
-        <span className="block text-sm">{label}</span>
-        {hint && <span className="block text-xs text-dim">{hint}</span>}
-      </span>
-      <input type="checkbox" role="switch" checked={checked} onChange={(e) => onChange(e.target.checked)} className="peer sr-only" />
-      <span
-        aria-hidden="true"
-        className="relative h-6 w-11 shrink-0 rounded-full bg-raised transition-colors peer-checked:bg-gold peer-focus-visible:ring-2 peer-focus-visible:ring-gold/60 after:absolute after:top-0.5 after:left-0.5 after:h-5 after:w-5 after:rounded-full after:bg-ink after:transition-transform peer-checked:after:translate-x-5 peer-checked:after:bg-night"
-      />
-    </label>
+    <SettingsCard title="Al iniciar">
+      <div className="space-y-3">
+        <Toggle
+          label="Abrir RiftLab al iniciar Windows"
+          checked={settings.openAtLogin}
+          onChange={(openAtLogin) => void updateDesktopSettings({ openAtLogin })}
+        />
+        <Toggle
+          label="Abrir directo en mi perfil"
+          hint="Si está apagado, la app abre en el inicio."
+          checked={settings.openOnProfile}
+          onChange={(openOnProfile) => void updateDesktopSettings({ openOnProfile })}
+        />
+        {settings.games !== "lol" && (
+          <Toggle
+            label="Ventana flotante en partidas de TFT"
+            hint="Se abre encima del juego con tus comps fijadas y las recetas. Ctrl + Shift + T la muestra u oculta."
+            checked={settings.tftOverlay}
+            onChange={(tftOverlay) => void updateDesktopSettings({ tftOverlay })}
+          />
+        )}
+      </div>
+    </SettingsCard>
   );
 }
 

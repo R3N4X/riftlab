@@ -5,7 +5,7 @@ import { usePathname, useRouter } from "next/navigation";
 import { useState, useSyncExternalStore } from "react";
 import { FriendsBox } from "./friends";
 import { GlobalSearch, type SearchChampion } from "./global-search";
-import { useDesktopAccount } from "./live-client";
+import { useDesktopAccount, useDesktopSettings } from "./live-client";
 import { LEGAL_NOTICE_EN } from "@/lib/constants";
 import { profilePath } from "@/lib/live";
 import { worldsRunning } from "@/lib/worlds";
@@ -174,6 +174,8 @@ export function Nav(props: NavProps) {
 /** Misma barra sin ruta activa: se muestra mientras la ruta dinámica resuelve. */
 export function NavView({ patch, version, champions, pathname }: NavProps & { pathname: string | null }) {
   const [open, setOpen] = useState(false);
+  // Quien eligió "Solo League" en la configuración no ve la sección de TFT.
+  const showTft = useDesktopSettings()?.games !== "lol";
 
   return (
     <>
@@ -231,7 +233,7 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
           })}
           {/* Misma línea que separa Ajustes: League arriba, TFT abajo. */}
           <span className="mt-3 h-px bg-line" aria-hidden="true" />
-          <TftBox pathname={pathname} onNavigate={() => setOpen(false)} />
+          {showTft && <TftBox pathname={pathname} onNavigate={() => setOpen(false)} />}
           <FriendsBox champions={champions} version={version} onNavigate={() => setOpen(false)} />
         </nav>
         {/* Ajustes va al final, aparte de las secciones de contenido, como en cualquier app. */}

@@ -2,6 +2,7 @@ import type { Metadata } from "next";
 import { Barlow, Barlow_Condensed } from "next/font/google";
 import { Suspense } from "react";
 import { LiveWatcher } from "@/components/live-client";
+import { FirstRunSetup } from "@/components/first-run";
 import { FriendAlerts } from "@/components/friends";
 import { Nav, NavView } from "@/components/nav";
 import { getChampionList, getLatestVersion, versionToPatch } from "@/lib/ddragon";
@@ -40,6 +41,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
           <LiveWatcher />
         </Suspense>
         <FriendAlerts champions={champions} />
+        <FirstRunSetup />
       </body>
     </html>
   );

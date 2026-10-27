@@ -7,6 +7,7 @@ import type {
   BuildPayload,
   DesktopAccount,
   DesktopBridge,
+  DesktopSettings,
   LiveState,
   RunePagePayload,
   TftPlanPayload,
@@ -29,6 +30,11 @@ const bridge: DesktopBridge = {
   setAccount: (account: DesktopAccount | null) => ipcRenderer.invoke("account:set", account),
   getSettings: () => ipcRenderer.invoke("settings:get"),
   setSettings: (patch) => ipcRenderer.invoke("settings:set", patch),
+  onSettings: (callback) => {
+    const listener = (_e: IpcRendererEvent, settings: DesktopSettings) => callback(settings);
+    ipcRenderer.on("settings:changed", listener);
+    return () => ipcRenderer.removeListener("settings:changed", listener);
+  },
   setApiKey: (key: string) => ipcRenderer.invoke("settings:api-key", key),
   importRunes: (page: RunePagePayload) => ipcRenderer.invoke("live:import-runes", page),
   setSpells: (spell1Id: number, spell2Id: number) => ipcRenderer.invoke("live:set-spells", spell1Id, spell2Id),

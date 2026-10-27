@@ -9,7 +9,16 @@ import Link from "next/link";
 import { usePathname, useRouter, useSearchParams } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { PLATFORMS } from "@/lib/constants";
-import { draftToQuery, runeKeyToPage, type ActionResult, type BuildPayload, type DesktopAccount, type LiveState } from "@/lib/live";
+import {
+  draftToQuery,
+  runeKeyToPage,
+  type ActionResult,
+  type BuildPayload,
+  type DesktopAccount,
+  type DesktopSettings,
+  type LiveState,
+  type SettingsPatch,
+} from "@/lib/live";
 
 /* ---------- Estado del cliente de League ---------- */
 
@@ -59,6 +68,48 @@ export function useDesktopAccount() {
     () => account,
     () => null,
   );
+}
+
+/* ---------- Ajustes de la app de escritorio ---------- */
+
+// Un solo enganche al puente para todos los componentes. Se engancha recién cuando algún componente
+// se suscribe y el puente existe, y avisa a todos los suscritos (incluso los que llegaron antes).
+let settings: DesktopSettings | null = null;
+const settingsListeners = new Set<() => void>();
+let settingsHooked = false;
+
+function publishSettings(next: DesktopSettings) {
+  settings = next;
+  for (const listener of settingsListeners) listener();
+}
+
+function subscribeSettings(onChange: () => void) {
+  settingsListeners.add(onChange);
+  const bridge = window.riftlab;
+  if (bridge && !settingsHooked) {
+    settingsHooked = true;
+    void bridge.getSettings().then(publishSettings);
+    bridge.onSettings(publishSettings);
+  }
+  return () => {
+    settingsListeners.delete(onChange);
+  };
+}
+
+/** Ajustes de la app de escritorio (null en el navegador o mientras cargan). */
+export function useDesktopSettings() {
+  return useSyncExternalStore(
+    subscribeSettings,
+    () => settings,
+    () => null,
+  );
+}
+
+/** Cambia ajustes de la app de escritorio; todas las pantallas se enteran por onSettings. */
+export async function updateDesktopSettings(patch: SettingsPatch) {
+  const bridge = window.riftlab;
+  if (!bridge) return;
+  publishSettings(await bridge.setSettings(patch));
 }
 
 /** null en el servidor; false en el navegador; true en la app de escritorio. */
@@ -218,6 +269,11 @@ export function ImportBuildButton({ build }: { build: BuildPayload }) {
   return <ActionButton wide label="Importar build" run={() => window.riftlab!.importBuild(build)} />;
 }
 
+/** ["runas", "hechizos", "objetos"] → "runas, hechizos y objetos". */
+function listJoin(words: string[]): string {
+  return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} y ${words.at(-1)}`;
+}
+
 /**
  * Si el jugador lo activó en Ajustes, importa la build Top 1 una sola vez por
  * selección de campeones, sin tocar nada: cuando tu campeón está bloqueado y ya se ve el draft completo (etapa
@@ -229,13 +285,14 @@ export function AutoImportBuild({ championKey, build }: { championKey: string; b
   const latest = useRef(build);
   const [result, setResult] = useState<ActionResult | null>(null);
   // Solo si el jugador lo activó en Ajustes: importar sin que lo pida le quitaría la decisión.
-  const [enabled, setEnabled] = useState(false);
+  const settings = useDesktopSettings();
+  const parts = settings?.autoImportParts;
+  const enabled = Boolean(settings?.autoImport && parts && (parts.runes || parts.spells || parts.items));
+  const partsRef = useRef(parts);
   useEffect(() => {
     latest.current = build;
+    partsRef.current = parts;
   });
-  useEffect(() => {
-    void window.riftlab?.getSettings().then((s) => setEnabled(s.autoImport));
-  }, []);
 
   const cs = state?.champSelect;
   const me = cs?.myTeam.find((p) => p.isMe);
@@ -251,9 +308,19 @@ export function AutoImportBuild({ championKey, build }: { championKey: string; b
     const timer = setTimeout(async () => {
       if (autoImportedFor === championKey) return;
       autoImportedFor = championKey;
+      const p = partsRef.current ?? { runes: true, spells: true, items: true };
+      const b = latest.current;
+      // Solo las partes elegidas en Ajustes; importBuild salta las que van vacías.
+      const payload: BuildPayload = {
+        ...b,
+        runes: p.runes ? b.runes : null,
+        spells: p.spells ? b.spells : null,
+        blocks: p.items ? b.blocks : [],
+      };
+      const names = [p.runes && "runas", p.spells && "hechizos", p.items && "objetos"].filter(Boolean) as string[];
       try {
-        const r = await window.riftlab!.importBuild(latest.current);
-        setResult({ ok: r.ok, message: r.ok ? "Build Top 1 importada sola: runas, hechizos y objetos." : r.message });
+        const r = await window.riftlab!.importBuild(payload);
+        setResult({ ok: r.ok, message: r.ok ? `Build Top 1 importada sola: ${listJoin(names)}.` : r.message });
       } catch {
         setResult({ ok: false, message: "No se pudo importar la build automáticamente." });
       }

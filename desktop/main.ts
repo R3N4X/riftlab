@@ -20,8 +20,10 @@ import {
   type ActionResult,
   type BuildPayload,
   type DesktopAccount,
+  type AutoImportParts,
   type DesktopSettings,
   type RunePagePayload,
+  type SettingsPatch,
   type TftPlanPayload,
   type UpdateStatus,
 } from "../src/lib/live";
@@ -95,6 +97,10 @@ interface StoredSettings {
   openOnProfile?: boolean;
   tftOverlay?: boolean;
   autoImport?: boolean;
+  autoImportParts?: Partial<AutoImportParts>;
+  games?: DesktopSettings["games"];
+  flashKey?: "D" | "F";
+  setupDone?: boolean;
   /** Dirección de las actualizaciones automáticas (carpeta con latest.yml). */
   updateUrl?: string;
 }
@@ -125,6 +131,14 @@ function currentSettings(): DesktopSettings {
     openOnProfile: stored.openOnProfile ?? true,
     tftOverlay: stored.tftOverlay ?? true,
     autoImport: stored.autoImport ?? false,
+    autoImportParts: {
+      runes: stored.autoImportParts?.runes ?? true,
+      spells: stored.autoImportParts?.spells ?? true,
+      items: stored.autoImportParts?.items ?? true,
+    },
+    games: stored.games === "lol" ? "lol" : "lol-tft",
+    flashKey: stored.flashKey === "D" || stored.flashKey === "F" ? stored.flashKey : null,
+    setupDone: stored.setupDone ?? false,
   };
 }
 
@@ -459,7 +473,8 @@ const league = new LeagueClient((state) => {
   overlay?.webContents.send("live:state", state);
 
   // La flotante se abre al empezar una partida de TFT y se cierra al terminar.
-  if (state.tft && !lastTft && currentSettings().tftOverlay) showOverlay();
+  const settings = currentSettings();
+  if (state.tft && !lastTft && settings.tftOverlay && settings.games !== "lol") showOverlay();
   if (!state.tft && lastTft) overlay?.close();
   lastTft = state.tft;
 
@@ -499,13 +514,36 @@ ipcMain.handle("account:set", (_e, next: DesktopAccount | null): ActionResult =>
 
 ipcMain.handle("settings:get", () => currentSettings());
 
-ipcMain.handle("settings:set", (_e, patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport">>) => {
+ipcMain.handle("settings:set", (_e, patch: SettingsPatch) => {
   if (typeof patch?.openAtLogin === "boolean") app.setLoginItemSettings({ ...loginItem(), openAtLogin: patch.openAtLogin });
-  if (typeof patch?.openOnProfile === "boolean") writeSettings({ ...readSettings(), openOnProfile: patch.openOnProfile });
-  if (typeof patch?.tftOverlay === "boolean") writeSettings({ ...readSettings(), tftOverlay: patch.tftOverlay });
-  if (typeof patch?.autoImport === "boolean") writeSettings({ ...readSettings(), autoImport: patch.autoImport });
-  return currentSettings();
+  const next = readSettings();
+  if (typeof patch?.openOnProfile === "boolean") next.openOnProfile = patch.openOnProfile;
+  if (typeof patch?.tftOverlay === "boolean") next.tftOverlay = patch.tftOverlay;
+  if (typeof patch?.autoImport === "boolean") next.autoImport = patch.autoImport;
+  if (patch?.autoImportParts && typeof patch.autoImportParts === "object") {
+    const parts = { ...next.autoImportParts };
+    for (const k of ["runes", "spells", "items"] as const) {
+      if (typeof patch.autoImportParts[k] === "boolean") parts[k] = patch.autoImportParts[k];
+    }
+    next.autoImportParts = parts;
+  }
+  if (patch?.games === "lol" || patch?.games === "lol-tft") next.games = patch.games;
+  if (patch?.flashKey === "D" || patch?.flashKey === "F") next.flashKey = patch.flashKey;
+  else if (patch?.flashKey === null) delete next.flashKey;
+  if (typeof patch?.setupDone === "boolean") next.setupDone = patch.setupDone;
+  writeSettings(next);
+  return applySettings();
 });
+
+/** Pasa los ajustes al cliente de League y avisa a las ventanas abiertas. */
+function applySettings(): DesktopSettings {
+  const settings = currentSettings();
+  league.flashKey = settings.flashKey;
+  if (settings.games === "lol") overlay?.close();
+  win?.webContents.send("settings:changed", settings);
+  overlay?.webContents.send("settings:changed", settings);
+  return settings;
+}
 
 ipcMain.handle("settings:api-key", async (_e, raw: string): Promise<ActionResult> => {
   const key = typeof raw === "string" ? raw.trim() : "";
@@ -607,6 +645,7 @@ ipcMain.handle("update:install", () => {
 /* ---------- Ciclo de vida ---------- */
 
 app.whenReady().then(async () => {
+  league.flashKey = currentSettings().flashKey;
   league.start();
   if (!SMOKE) globalShortcut.register(OVERLAY_SHORTCUT, () => void toggleOverlay());
   try {

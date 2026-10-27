@@ -282,6 +282,8 @@ export class LeagueClient {
   private creds: Credentials | null = null;
   private timer: NodeJS.Timeout | null = null;
   private lastJson = "";
+  /** Tecla de Destello elegida en Ajustes (null: la que ya tenga en el cliente). */
+  flashKey: "D" | "F" | null = null;
   state: LiveState = {
     connected: false,
     phase: "None",
@@ -528,13 +530,15 @@ export class LeagueClient {
 
   async setSpells(spell1Id: number, spell2Id: number): Promise<ActionResult> {
     if (!this.creds) return { ok: false, message: "El cliente de League no está abierto." };
-    // Se respeta la tecla en la que el jugador ya tiene Destello (D o F).
+    // Destello va en la tecla que el jugador eligió en Ajustes; si no eligió, en la que ya
+    // tiene en el cliente (D o F).
     const me = this.state.champSelect?.myTeam.find((p) => p.isMe);
     let [d, f] = [spell1Id, spell2Id];
     const FLASH = 4;
-    if (me && (d === FLASH || f === FLASH)) {
+    if (d === FLASH || f === FLASH) {
       const other = d === FLASH ? f : d;
-      [d, f] = me.spell2Id === FLASH ? [other, FLASH] : [FLASH, other];
+      const onF = this.flashKey ? this.flashKey === "F" : me?.spell2Id === FLASH;
+      if (this.flashKey || me) [d, f] = onF ? [other, FLASH] : [FLASH, other];
     }
     const res = await request(this.creds, "PATCH", "/lol-champ-select/v1/session/my-selection", { spell1Id: d, spell2Id: f });
     return res.status >= 200 && res.status < 300

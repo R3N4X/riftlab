@@ -47,6 +47,9 @@ Resumen de lo hecho el 25-10-2026 (sesión que quedó en otro chat por error). L
 
 ### Ajustes (`/ajustes`)
 - Cuenta de League (automática desde el cliente o manual con Riot ID verificado), servidor por defecto, inicio con Windows, abrir en mi perfil, ventana flotante de TFT, clave de la API con reinicio.
+- Juegos (`games`: "lol-tft" o "lol"; con "lol" se ocultan el recuadro de TFT y la ventana flotante), tecla de Destello (`flashKey`: D, F o null para respetar la del cliente; la aplica `setSpells` en `desktop/lcu.ts`, también al importar) e importación automática con sus partes (`autoImport` + `autoImportParts`: runas, hechizos, objetos).
+- Configuración inicial (`src/components/first-run.tsx`, desde la 0.2.7): ventana de 4 pasos (juegos, Destello, importar la build, al iniciar) que aparece mientras `setupDone` sea false, también a quien actualiza desde una versión anterior. Se repite desde Ajustes → Juegos. La importación automática sigue apagada por defecto: el asistente solo la prende si el jugador lo elige.
+- Los ajustes viven en `ajustes.json` (proceso principal); la página los lee con `useDesktopSettings()` y los cambia con `updateDesktopSettings()` (`src/components/live-client.tsx`), y el proceso principal avisa a todas las ventanas con `settings:changed`.
 
 ### Sección TFT (`/tft`, recuadro propio en la barra lateral)
 - Comps calculadas con partidas reales: `npm run aggregate:tft` (Retador/GM/Maestro de la2, euw1, kr, vn2 → `data/tft-meta.json`). Comp = carry con más objetos + rasgo principal no único. Correrlo seguido y tras cada parche.

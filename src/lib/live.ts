@@ -133,7 +133,29 @@ export interface DesktopSettings {
   tftOverlay: boolean;
   /** Importar sola la build Top 1 al bloquear el campeón. Apagado salvo que el jugador lo active. */
   autoImport: boolean;
+  /** Qué partes de la build se importan solas cuando autoImport está prendido. */
+  autoImportParts: AutoImportParts;
+  /** Juegos que le interesan: con "lol" se ocultan la sección y la ventana flotante de TFT. */
+  games: "lol-tft" | "lol";
+  /** Tecla de Destello al poner hechizos; null respeta la que ya tiene en el cliente. */
+  flashKey: "D" | "F" | null;
+  /** Ya pasó por la configuración inicial (o la saltó). */
+  setupDone: boolean;
 }
+
+export interface AutoImportParts {
+  runes: boolean;
+  spells: boolean;
+  items: boolean;
+}
+
+/** Ajustes que la página puede cambiar (el resto se cambia por su propia vía o es de solo lectura). */
+export type SettingsPatch = Partial<
+  Pick<
+    DesktopSettings,
+    "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport" | "autoImportParts" | "games" | "flashKey" | "setupDone"
+  >
+>;
 
 /** Estado de las actualizaciones automáticas (solo en la app instalada). */
 export interface UpdateStatus {
@@ -155,7 +177,9 @@ export interface DesktopBridge {
   /** Vincula una cuenta a mano, o la desvincula con null. */
   setAccount(account: DesktopAccount | null): Promise<ActionResult>;
   getSettings(): Promise<DesktopSettings>;
-  setSettings(patch: Partial<Pick<DesktopSettings, "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport">>): Promise<DesktopSettings>;
+  setSettings(patch: SettingsPatch): Promise<DesktopSettings>;
+  /** Avisa cuando cambian los ajustes (desde Ajustes, la configuración inicial u otra ventana). */
+  onSettings(callback: (settings: DesktopSettings) => void): () => void;
   /** Prueba la clave contra Riot, la guarda y reinicia la app. Vacía, vuelve a la del .env.local. */
   setApiKey(key: string): Promise<ActionResult>;
   importRunes(page: RunePagePayload): Promise<ActionResult>;

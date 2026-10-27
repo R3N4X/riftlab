@@ -8,6 +8,7 @@ import { GlobalSearch, type SearchChampion } from "./global-search";
 import { useDesktopAccount } from "./live-client";
 import { LEGAL_NOTICE_EN } from "@/lib/constants";
 import { profilePath } from "@/lib/live";
+import { worldsRunning } from "@/lib/worlds";
 
 const LINKS = [
   { href: "/", label: "Inicio", icon: "M3 11.5 12 4l9 7.5V20a1 1 0 0 1-1 1h-5v-6H9v6H4a1 1 0 0 1-1-1z" },
@@ -178,7 +179,7 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
     <>
       {/* Barra superior en pantallas chicas */}
       <div className="sticky top-0 z-30 flex items-center justify-between border-b border-line bg-night/95 px-4 py-3 backdrop-blur lg:hidden">
-        <Logo patch={patch} />
+        <Logo patch={patch} pathname={pathname} onNavigate={() => setOpen(false)} />
         <button
           type="button"
           onClick={() => setOpen((v) => !v)}
@@ -194,7 +195,7 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
         className={`${open ? "block" : "hidden"} fixed inset-x-0 top-[57px] z-20 border-b border-line bg-surface px-3 py-4 lg:sticky lg:top-[var(--titlebar-h)] lg:flex lg:h-[calc(100dvh-var(--titlebar-h))] lg:flex-col no-scrollbar lg:overflow-y-auto lg:w-60 lg:shrink-0 lg:border-r lg:border-b-0 lg:px-4 lg:py-6`}
       >
         <div className="mb-6 hidden px-2 lg:block">
-          <Logo patch={patch} />
+          <Logo patch={patch} pathname={pathname} onNavigate={() => setOpen(false)} />
         </div>
         <div className="mb-4 lg:px-1">
           <GlobalSearch champions={champions} version={version} />
@@ -264,13 +265,42 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
   );
 }
 
-function Logo({ patch }: { patch: string }) {
+function Logo({ patch, pathname, onNavigate }: { patch: string; pathname: string | null; onNavigate: () => void }) {
   return (
-    <Link href="/" className="flex items-baseline gap-2">
-      <span className="font-display text-2xl font-bold tracking-tight text-ink">
-        Rift<span className="text-gold">Lab</span>
-      </span>
-      <span className="rounded border border-line px-1.5 py-0.5 font-display text-xs text-muted">{patch}</span>
+    <div className="flex items-center gap-2">
+      <Link href="/" className="flex items-baseline gap-2">
+        <span className="font-display text-2xl font-bold tracking-tight text-ink">
+          Rift<span className="text-gold">Lab</span>
+        </span>
+        <span className="rounded border border-line px-1.5 py-0.5 font-display text-xs text-muted">{patch}</span>
+      </Link>
+      <WorldsButton active={pathname === "/worlds"} onNavigate={onNavigate} />
+    </div>
+  );
+}
+
+const noSubscribe = () => () => {};
+
+/*
+ * Acceso temporal al calendario de Worlds: va junto a la versión para que se vea sin ocupar un lugar
+ * fijo en la lista de secciones, y desaparece solo después de la final.
+ */
+function WorldsButton({ active, onNavigate }: { active: boolean; onNavigate: () => void }) {
+  const running = useSyncExternalStore(noSubscribe, () => worldsRunning(), () => true);
+  if (!running) return null;
+  return (
+    <Link
+      href="/worlds"
+      onClick={onNavigate}
+      title="Calendario de Worlds 2026"
+      className={`ml-auto flex items-center gap-1 rounded-full border px-2 py-0.5 font-display text-xs font-semibold transition-colors ${
+        active ? "border-gold bg-gold text-night" : "border-gold/50 bg-gold/10 text-gold-soft hover:border-gold hover:bg-gold/20"
+      }`}
+    >
+      <svg viewBox="0 0 24 24" className="h-3 w-3 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+        <path d="M8 21h8M12 17v4M7 4h10v5a5 5 0 0 1-10 0zM7 6H4a3 3 0 0 0 3 4M17 6h3a3 3 0 0 1-3 4" />
+      </svg>
+      Worlds
     </Link>
   );
 }

@@ -284,6 +284,28 @@ export async function getAccountByRiotId(platform: Platform, gameName: string, t
   );
 }
 
+const puuidByRiotId = new Map<string, string>();
+
+/**
+ * El cliente de League entrega el puuid sin cifrar para nuestra clave: la API lo rechaza con 400
+ * ("Exception decrypting"). Con el Riot ID se consigue el puuid que sí entiende la clave.
+ * Si no hay Riot ID o la búsqueda falla, se usa el puuid recibido.
+ */
+export async function apiPuuid(platform: Platform, riotId: string | null | undefined, fallback: string): Promise<string> {
+  const hash = riotId?.lastIndexOf("#") ?? -1;
+  if (!riotId || hash <= 0 || hash === riotId.length - 1) return fallback;
+  const key = `${accountRegionOf(platform)}:${riotId.toLowerCase()}`;
+  const cached = puuidByRiotId.get(key);
+  if (cached) return cached;
+  try {
+    const account = await getAccountByRiotId(platform, riotId.slice(0, hash), riotId.slice(hash + 1));
+    puuidByRiotId.set(key, account.puuid);
+    return account.puuid;
+  } catch {
+    return fallback;
+  }
+}
+
 export async function getSummonerByPuuid(platform: Platform, puuid: string) {
   return riotFetch<Summoner>(platform, `/lol/summoner/v4/summoners/by-puuid/${puuid}`);
 }

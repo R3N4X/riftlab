@@ -49,6 +49,7 @@ async function SpectateContent({ params, searchParams }: Pick<PageProps<"/espect
         spells={slimSpells}
         version={version}
         preview={`${platform}:${puuid}`}
+        previewRiotId={name ?? undefined}
         teamLabel={gameName ? `Equipo de ${gameName}` : "Su equipo"}
       />
     </div>

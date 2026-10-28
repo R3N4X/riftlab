@@ -27,12 +27,15 @@ export function LoadingScreen({
   spells,
   version,
   preview,
+  previewRiotId,
   teamLabel = "Tu equipo",
 }: {
   champs: Champs;
   spells: Spells;
   version: string;
   preview?: string;
+  /** Riot ID (Nombre#TAG) del jugador de `preview`, para traducir su puuid del cliente. */
+  previewRiotId?: string;
   /** Título del equipo del jugador ("Equipo de X" al ver la partida de un amigo). */
   teamLabel?: string;
 }) {
@@ -43,6 +46,8 @@ export function LoadingScreen({
   // La partida de otro jugador (amigo) manda sobre la propia.
   const platform = (preview ? previewPlatform : live?.platform) ?? null;
   const puuid = (preview ? previewPuuid : live?.puuid) ?? null;
+  // El puuid del cliente no sirve para la API: el servidor lo traduce con el Riot ID.
+  const riotId = preview ? previewRiotId : live ? `${live.gameName}#${live.tagLine}` : undefined;
   const key = platform && puuid ? `${platform}:${puuid}:${preview ? "" : (state?.lastGame?.gameId ?? "")}` : null;
 
   const [result, setResult] = useState<Result | null>(null);
@@ -52,7 +57,7 @@ export function LoadingScreen({
     if (!key || !platform || !puuid) return;
     let cancelled = false;
     let retry: ReturnType<typeof setTimeout> | undefined;
-    fetch(`/api/en-vivo/jugadores?platform=${platform}&puuid=${encodeURIComponent(puuid)}`)
+    fetch(`/api/en-vivo/jugadores?platform=${platform}&puuid=${encodeURIComponent(puuid)}${riotId ? `&riotId=${encodeURIComponent(riotId)}` : ""}`)
       .then(async (res) => {
         const body = await res.json();
         if (cancelled) return;
@@ -67,7 +72,7 @@ export function LoadingScreen({
       cancelled = true;
       if (retry) clearTimeout(retry);
     };
-  }, [key, platform, puuid, attempt]);
+  }, [key, platform, puuid, riotId, attempt]);
 
   if (!key) return null;
   const current = result?.key === key ? result : null;

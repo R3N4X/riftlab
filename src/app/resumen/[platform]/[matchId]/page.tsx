@@ -62,8 +62,12 @@ async function ReviewContent({ params, searchParams }: Pick<PageProps<"/resumen/
   const match = loaded.match;
 
   const [version, champsByKey, items, runes] = await Promise.all([getLatestVersion(), getChampionsByKey(), getItems(), getRuneIndex()]);
-  const puuid = parseString(sp, "yo");
-  const me = puuid ? match.info.participants.find((p) => p.puuid === puuid) : undefined;
+  // "yo" es un puuid o un Riot ID (Nombre#TAG): la app de escritorio manda el Riot ID, porque el
+  // puuid del cliente de League no coincide con el de la API.
+  const yo = parseString(sp, "yo")?.toLowerCase();
+  const me = yo
+    ? match.info.participants.find((p) => p.puuid.toLowerCase() === yo || `${p.riotIdGameName}#${p.riotIdTagline}`.toLowerCase() === yo)
+    : undefined;
 
   if (!me) {
     return (

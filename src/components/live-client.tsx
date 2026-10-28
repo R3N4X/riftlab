@@ -390,7 +390,7 @@ export function LiveWatcher() {
       reviewedGame !== lastGame.gameId
     ) {
       reviewedGame = lastGame.gameId;
-      router.push(`/resumen/${summoner.platform}/${summoner.platform.toUpperCase()}_${lastGame.gameId}?yo=${summoner.puuid}`);
+      router.push(`/resumen/${summoner.platform}/${summoner.platform.toUpperCase()}_${lastGame.gameId}?yo=${encodeURIComponent(`${summoner.gameName}#${summoner.tagLine}`)}`);
     }
   }, [phase, tft, gameMode, pathname, router, lastGame, summoner]);
 

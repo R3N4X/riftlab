@@ -10,7 +10,7 @@ import Link from "next/link";
 import { useRouter } from "next/navigation";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { img } from "@/lib/assets";
-import type { LiveFriend } from "@/lib/live";
+import type { LiveFriend, LiveState } from "@/lib/live";
 import { useLiveState } from "./live-client";
 
 export interface FriendChampion {
@@ -33,18 +33,21 @@ const QUEUE_LABEL: Record<string, string> = {
 
 /* ---------- Con quién juegas seguido (una consulta por sesión) ---------- */
 
-let frequent: { key: string; puuids: Set<string> } | null = null;
+let frequent: { key: string; ids: Set<string> } | null = null;
 let frequentLoading: string | null = null;
 const frequentListeners = new Set<() => void>();
 
-function loadFrequent(platform: string, puuid: string) {
+/** "Nombre#TAG" en minúsculas: los amigos se reconocen por Riot ID, porque el puuid del cliente no es el de la API. */
+const idKey = (gameName: string, tagLine: string) => `${gameName}#${tagLine}`.toLowerCase();
+
+function loadFrequent(platform: string, puuid: string, riotId: string) {
   const key = `${platform}:${puuid}`;
   if (frequent?.key === key || frequentLoading === key) return;
   frequentLoading = key;
-  fetch(`/api/frecuentes?platform=${platform}&puuid=${encodeURIComponent(puuid)}`)
+  fetch(`/api/frecuentes?platform=${platform}&puuid=${encodeURIComponent(puuid)}&riotId=${encodeURIComponent(riotId)}`)
     .then((r) => (r.ok ? r.json() : []))
-    .then((list: { puuid: string }[]) => {
-      frequent = { key, puuids: new Set(list.map((m) => m.puuid)) };
+    .then((list: { gameName: string; tagLine: string }[]) => {
+      frequent = { key, ids: new Set(list.map((m) => idKey(m.gameName, m.tagLine))) };
       frequentListeners.forEach((l) => l());
     })
     .catch(() => {
@@ -52,18 +55,22 @@ function loadFrequent(platform: string, puuid: string) {
     });
 }
 
-function useFrequent(platform: string | null | undefined, puuid: string | undefined): Set<string> {
+/** Riot ID (en minúsculas) de los compañeros frecuentes del jugador conectado. */
+function useFrequent(summoner: LiveState["summoner"] | undefined): Set<string> {
   const set = useSyncExternalStore(
     (cb) => {
       frequentListeners.add(cb);
       return () => frequentListeners.delete(cb);
     },
-    () => frequent?.puuids ?? EMPTY,
+    () => frequent?.ids ?? EMPTY,
     () => EMPTY,
   );
+  const platform = summoner?.platform;
+  const puuid = summoner?.puuid;
+  const riotId = summoner ? `${summoner.gameName}#${summoner.tagLine}` : null;
   useEffect(() => {
-    if (platform && puuid) loadFrequent(platform, puuid);
-  }, [platform, puuid]);
+    if (platform && puuid && riotId) loadFrequent(platform, puuid, riotId);
+  }, [platform, puuid, riotId]);
   return set;
 }
 const EMPTY = new Set<string>();
@@ -117,7 +124,7 @@ export function FriendAlerts({ champions }: { champions: FriendChampion[] }) {
   const router = useRouter();
   const on = useAlertsOn();
   const platform = state?.summoner?.platform;
-  const mates = useFrequent(platform, state?.summoner?.puuid);
+  const mates = useFrequent(state?.summoner);
   const previous = useRef<Map<string, LiveFriend["status"]> | null>(null);
   const friends = state?.friends ?? null;
 
@@ -128,7 +135,7 @@ export function FriendAlerts({ champions }: { champions: FriendChampion[] }) {
     // La primera lectura solo fija el punto de partida: no avisa de los que ya estaban jugando.
     if (!before || !on || !platform || typeof Notification === "undefined") return;
     for (const f of friends) {
-      if (f.status !== "inGame" || before.get(f.puuid) === "inGame" || !mates.has(f.puuid)) continue;
+      if (f.status !== "inGame" || before.get(f.puuid) === "inGame" || !mates.has(idKey(f.gameName, f.tagLine))) continue;
       const champ = f.championId ? champions.find((c) => c.key === String(f.championId))?.name : null;
       const queue = f.queue ? (QUEUE_LABEL[f.queue] ?? null) : null;
       const n = new Notification(`${f.gameName} entró a partida`, {
@@ -151,7 +158,7 @@ export function FriendsBox({ champions, version, onNavigate }: { champions: Frie
   const state = useLiveState();
   const on = useAlertsOn();
   const platform = state?.summoner?.platform;
-  const mates = useFrequent(platform, state?.summoner?.puuid);
+  const mates = useFrequent(state?.summoner);
   // La hora se lee después de montar (leerla al renderizar rompe el prerender de Next).
   const [now, setNow] = useState(0);
   useEffect(() => {
@@ -166,7 +173,7 @@ export function FriendsBox({ champions, version, onNavigate }: { champions: Frie
   if (!state?.connected || !state.friends || !platform) return null;
   const playing = state.friends.filter((f) => f.status === "inGame" || f.status === "champSelect");
   // Primero los que juegan seguido contigo.
-  playing.sort((a, b) => Number(mates.has(b.puuid)) - Number(mates.has(a.puuid)));
+  playing.sort((a, b) => Number(mates.has(idKey(b.gameName, b.tagLine))) - Number(mates.has(idKey(a.gameName, a.tagLine))));
   const online = state.friends.length;
 
   return (
@@ -233,7 +240,7 @@ export function FriendsBox({ champions, version, onNavigate }: { champions: Frie
                   <span className="min-w-0 flex-1 leading-tight">
                     <span className="flex items-center gap-1 truncate text-sm text-ink">
                       {f.gameName}
-                      {mates.has(f.puuid) && (
+                      {mates.has(idKey(f.gameName, f.tagLine)) && (
                         <span className="text-gold" title="Juegas seguido con esta persona" aria-label="Juegas seguido con esta persona">
                           ★
                         </span>

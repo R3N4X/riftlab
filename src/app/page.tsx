@@ -111,12 +111,11 @@ function StrongestOverall({ tier, version }: { tier: Awaited<ReturnType<typeof g
           <li key={row.champion.key}>
             <Link href={`/campeones/${row.champion.id}?role=${row.role}`} className="flex items-center gap-3 rounded-md px-1 py-1.5 hover:bg-raised">
               <ChampIcon version={version} id={row.champion.id} name={row.champion.name} size={32} />
-              <span className="min-w-0 flex-1">
-                <span className="block truncate font-medium">{row.champion.name}</span>
-                <span className="flex items-center gap-1 text-xs text-dim">
-                  <RoleIcon role={row.role} size={11} />
-                  {ROLE_LABEL[row.role]}
-                </span>
+              {/* El rol va en la misma línea que el nombre: así las filas miden lo mismo que en los otros cuadros. */}
+              <span className="flex min-w-0 flex-1 items-center gap-1.5" title={ROLE_LABEL[row.role]}>
+                <span className="truncate font-medium">{row.champion.name}</span>
+                <RoleIcon role={row.role} size={14} className="opacity-70" />
+                <span className="sr-only">({ROLE_LABEL[row.role]})</span>
               </span>
               <span className={`text-sm ${wrClass(row.winRate)}`}>{pct(row.winRate)}</span>
               <TierBadge tier={row.tier} />

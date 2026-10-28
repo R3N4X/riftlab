@@ -223,23 +223,37 @@ export function FriendsBox({ champions, version, onNavigate }: { champions: Frie
                 : `/invocador/${platform}/${encodeURIComponent(`${f.gameName}-${f.tagLine}`)}`;
             return (
               <li key={f.puuid}>
-                <Link href={href} onClick={onNavigate} className="flex items-center gap-2 rounded px-2 py-1 hover:bg-raised/60">
-                  {champ ? (
-                    <img
-                      src={img.champion(version, champ.id)}
-                      alt={champ.name}
-                      width={24}
-                      height={24}
-                      className="h-6 w-6 shrink-0 rounded"
-                    />
-                  ) : f.icon !== null ? (
-                    <img src={img.profileIcon(version, f.icon)} alt="" width={24} height={24} className="h-6 w-6 shrink-0 rounded" />
-                  ) : (
-                    <span className="h-6 w-6 shrink-0 rounded bg-raised" />
-                  )}
+                <Link href={href} onClick={onNavigate} className="flex items-center gap-2 rounded px-1.5 py-1.5 hover:bg-raised/60">
+                  {/* Ícono de perfil del amigo; el campeón que juega va como insignia en la esquina. */}
+                  <span className="relative shrink-0">
+                    {f.icon !== null ? (
+                      <img
+                        src={img.profileIcon(version, f.icon)}
+                        alt=""
+                        width={32}
+                        height={32}
+                        className="h-8 w-8 rounded-md ring-1 ring-line"
+                      />
+                    ) : (
+                      <span className="block h-8 w-8 rounded-md bg-raised" />
+                    )}
+                    {champ && (
+                      <img
+                        src={img.champion(version, champ.id)}
+                        alt={champ.name}
+                        title={champ.name}
+                        width={16}
+                        height={16}
+                        className="absolute -right-1.5 -bottom-1.5 h-4 w-4 rounded-full ring-2 ring-surface"
+                      />
+                    )}
+                  </span>
                   <span className="min-w-0 flex-1 leading-tight">
-                    <span className="flex items-center gap-1 truncate text-sm text-ink">
-                      {f.gameName}
+                    <span className="flex items-center gap-1 text-sm text-ink">
+                      <span className="truncate">
+                        {f.gameName}
+                        {f.tagLine && <span className="text-dim">#{f.tagLine}</span>}
+                      </span>
                       {mates.has(idKey(f.gameName, f.tagLine)) && (
                         <span className="text-gold" title="Juegas seguido con esta persona" aria-label="Juegas seguido con esta persona">
                           ★

@@ -11,7 +11,7 @@ import { randomUUID } from "node:crypto";
 import { existsSync, readFileSync } from "node:fs";
 import https from "node:https";
 import { join } from "node:path";
-import { ROLES, type Platform, type Role } from "../src/lib/constants";
+import { ROLES, TIERS, type Platform, type Role, type Tier } from "../src/lib/constants";
 import type {
   ActionResult,
   BuildPayload,
@@ -20,8 +20,43 @@ import type {
   LiveFriend,
   LivePlayer,
   LiveState,
+  LpChange,
   RunePagePayload,
 } from "../src/lib/live";
+
+/* ---------- LP por partida ---------- */
+
+const RANKED_QUEUES: Record<number, string> = { 420: "RANKED_SOLO_5x5", 440: "RANKED_FLEX_SR" };
+const APEX = new Set(["MASTER", "GRANDMASTER", "CHALLENGER"]);
+const DIVISIONS = ["IV", "III", "II", "I"];
+
+interface RankedSnapshot {
+  tier: string;
+  division: string;
+  lp: number;
+  games: number;
+}
+
+/** Rango como número continuo (100 por división; de Maestro en adelante solo cuentan los LP). */
+function rankPoints(s: RankedSnapshot): number | null {
+  const tier = TIERS.indexOf(s.tier as Tier);
+  if (tier < 0) return null;
+  if (APEX.has(s.tier)) return TIERS.indexOf("MASTER") * 400 + s.lp;
+  const division = DIVISIONS.indexOf(s.division);
+  return division < 0 ? null : tier * 400 + division * 100 + s.lp;
+}
+
+interface PendingLp {
+  gameId: number;
+  queueId: number;
+  queueType: string;
+  matchId: string;
+  riotId: string;
+  before: RankedSnapshot;
+  /** Cuándo se vio terminada la partida (0 mientras sigue). */
+  endedAt: number;
+  checkedAt: number;
+}
 
 interface Credentials {
   port: number;
@@ -300,6 +335,75 @@ export class LeagueClient {
 
   constructor(private onChange: (state: LiveState) => void) {}
 
+  /** Se llama cuando se conocen los LP que dio o quitó una clasificatoria. */
+  onLpChange: ((change: LpChange) => void) | null = null;
+  private lpPending: PendingLp | null = null;
+
+  private async rankedSnapshot(queueType: string): Promise<RankedSnapshot | null> {
+    if (!this.creds) return null;
+    const res = await request<{ queues?: { queueType: string; tier: string; division: string; leaguePoints: number; wins: number; losses: number }[] }>(
+      this.creds,
+      "GET",
+      "/lol-ranked/v1/current-ranked-stats",
+    );
+    const q = res.status === 200 ? res.data.queues?.find((x) => x.queueType === queueType) : undefined;
+    return q ? { tier: q.tier, division: q.division, lp: q.leaguePoints, games: q.wins + q.losses } : null;
+  }
+
+  /**
+   * LP de cada clasificatoria: se leen al estar en partida y, al terminar, se vuelven a leer cada
+   * pocos segundos hasta que el cliente sume la partida (o 5 minutos, por ejemplo en una nueva partida
+   * por abandono, que no cuenta).
+   */
+  private async trackLp(phase: string, lastGame: LiveState["lastGame"], summoner: LiveState["summoner"]) {
+    if (!lastGame || lastGame.tft || !summoner?.platform) return;
+    const queueType = RANKED_QUEUES[lastGame.queueId ?? 0];
+    if (!queueType) return;
+
+    if (IN_GAME.has(phase)) {
+      if (this.lpPending?.gameId === lastGame.gameId) return;
+      const before = await this.rankedSnapshot(queueType);
+      if (before)
+        this.lpPending = {
+          gameId: lastGame.gameId,
+          queueId: lastGame.queueId!,
+          queueType,
+          matchId: `${summoner.platform.toUpperCase()}_${lastGame.gameId}`,
+          riotId: `${summoner.gameName}#${summoner.tagLine}`,
+          before,
+          endedAt: 0,
+          checkedAt: 0,
+        };
+      return;
+    }
+
+    const p = this.lpPending;
+    if (!p || p.gameId !== lastGame.gameId) return;
+    const now = Date.now();
+    p.endedAt ||= now;
+    if (now - p.checkedAt < 5000) return;
+    p.checkedAt = now;
+    const after = await this.rankedSnapshot(p.queueType);
+    if (after && after.games > p.before.games) {
+      this.lpPending = null;
+      const [a, b] = [rankPoints(p.before), rankPoints(after)];
+      // Sin rango antes (partidas de clasificación) no hay LP que comparar.
+      if (a === null || b === null) return;
+      this.onLpChange?.({
+        matchId: p.matchId,
+        riotId: p.riotId,
+        queueId: p.queueId,
+        delta: b - a,
+        tier: after.tier,
+        division: APEX.has(after.tier) ? "" : after.division,
+        lp: after.lp,
+        at: now,
+      });
+    } else if (now - p.endedAt > 5 * 60_000) {
+      this.lpPending = null;
+    }
+  }
+
   start() {
     const tick = async () => {
       await this.poll().catch(() => this.disconnect());
@@ -404,6 +508,8 @@ export class LeagueClient {
         this.friendsAt = Date.now();
       }
     }
+
+    await this.trackLp(phase, lastGame, summoner).catch(() => {});
 
     this.publish({ connected: true, phase, summoner, champSelect, game, tft, mastery, lastGame, friends });
   }

@@ -2,6 +2,11 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.11 (28-10-2026)
+
+- En el historial, las clasificatorias muestran los LP que ganaste o perdiste junto a "Victoria" o "Derrota". Se registran desde ahora, en las partidas que juegues con RiftLab abierta (Riot no entrega los LP de partidas anteriores).
+- "Amigos jugando" muestra el ícono de perfil de cada amigo, con el campeón que está jugando en la esquina y su tag al lado del nombre.
+
 ## 0.2.10 (28-10-2026)
 
 - La partida en curso aparece ordenada por línea, en el perfil y en la pantalla de carga: cada jugador queda frente a su rival, de Superior a Soporte. La línea se estima por el campeón y por Aplastar.

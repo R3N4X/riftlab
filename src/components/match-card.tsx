@@ -7,9 +7,12 @@ import { scoreMatch, type PlayerScore } from "@/lib/match-score";
 import { riotIdToSlug, type Match, type MatchParticipant } from "@/lib/riot";
 import { SHARDS } from "./build";
 import { Expandable } from "./expandable";
+import { MatchLp } from "./match-lp";
 import { MatchRank, PlayerRank } from "./match-rank";
 import { MatchTimeline } from "./match-timeline";
 import { ChampIcon, ItemIcon, RuneIcon, SpellIcon } from "./icons";
+
+const RANKED_QUEUES = new Set([420, 440]);
 
 export interface MatchCardData {
   version: string;
@@ -50,7 +53,13 @@ export function MatchCard({ match, puuid, data }: { match: Match; puuid: string;
   const summary = (
     <div className="grid gap-x-6 gap-y-3 p-3 md:grid-cols-[150px_minmax(0,1fr)_220px]">
       <div className="text-sm">
-        <p className={`font-semibold ${remake ? "text-muted" : me.win ? "text-win" : "text-loss"}`}>{result}</p>
+        <p className={`font-semibold ${remake ? "text-muted" : me.win ? "text-win" : "text-loss"}`}>
+          {result}
+          {/* Solo en clasificatorias (las normales no mueven el rango). */}
+          {!remake && RANKED_QUEUES.has(match.info.queueId) && (
+            <MatchLp matchId={match.metadata.matchId} riotId={`${me.riotIdGameName}#${me.riotIdTagline}`} />
+          )}
+        </p>
         <p className="text-muted">{QUEUES[match.info.queueId] ?? match.info.gameMode}</p>
         <p className="text-dim">
           {duration(match.info.gameDuration)}, {timeAgo(finished, now)}

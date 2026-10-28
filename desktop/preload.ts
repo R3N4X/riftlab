@@ -9,6 +9,7 @@ import type {
   DesktopBridge,
   DesktopSettings,
   LiveState,
+  LpChange,
   RunePagePayload,
   TftPlanPayload,
   UpdateStatus,
@@ -40,6 +41,12 @@ const bridge: DesktopBridge = {
   setSpells: (spell1Id: number, spell2Id: number) => ipcRenderer.invoke("live:set-spells", spell1Id, spell2Id),
   importBuild: (build: BuildPayload) => ipcRenderer.invoke("live:import-build", build),
   exportTftPlan: (plan: TftPlanPayload) => ipcRenderer.invoke("tft:export-plan", plan),
+  getLpChanges: () => ipcRenderer.invoke("lp:get"),
+  onLpChange: (callback) => {
+    const listener = (_e: IpcRendererEvent, change: LpChange) => callback(change);
+    ipcRenderer.on("lp:changed", listener);
+    return () => ipcRenderer.removeListener("lp:changed", listener);
+  },
   toggleTftOverlay: () => ipcRenderer.invoke("tft:overlay"),
   focusWindow: () => ipcRenderer.invoke("window:focus"),
   getUpdate: () => ipcRenderer.invoke("update:get"),

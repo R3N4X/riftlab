@@ -157,6 +157,24 @@ export type SettingsPatch = Partial<
   >
 >;
 
+/**
+ * LP ganados o perdidos en una clasificatoria, leídos del cliente de League antes y después de la
+ * partida (Riot no los entrega en la API). Solo existen para partidas jugadas con la app abierta.
+ */
+export interface LpChange {
+  /** Id de la partida como en la API ("LA2_1234567890"). */
+  matchId: string;
+  /** Riot ID de quien la jugó (Nombre#TAG), para no mostrarlo en el perfil de otro jugador de la partida. */
+  riotId: string;
+  queueId: number;
+  delta: number;
+  /** Rango después de la partida. */
+  tier: string;
+  division: string;
+  lp: number;
+  at: number;
+}
+
 /** Estado de las actualizaciones automáticas (solo en la app instalada). */
 export interface UpdateStatus {
   state: "disabled" | "idle" | "checking" | "downloading" | "ready" | "none" | "error";
@@ -197,6 +215,9 @@ export interface DesktopBridge {
   installUpdate(): Promise<void>;
   /** Trae la ventana principal al frente (al hacer clic en un aviso). */
   focusWindow(): Promise<void>;
+  /** LP ganados o perdidos por partida clasificatoria, por id de partida. */
+  getLpChanges(): Promise<Record<string, LpChange>>;
+  onLpChange(callback: (change: LpChange) => void): () => void;
   /** Muestra u oculta la ventana flotante de TFT; devuelve si quedó visible. */
   toggleTftOverlay(): Promise<boolean>;
 }

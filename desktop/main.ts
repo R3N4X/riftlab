@@ -22,6 +22,7 @@ import {
   type DesktopAccount,
   type AutoImportParts,
   type DesktopSettings,
+  type LpChange,
   type RunePagePayload,
   type SettingsPatch,
   type TftPlanPayload,
@@ -488,6 +489,34 @@ const league = new LeagueClient((state) => {
   if (firstTime && currentSettings().openOnProfile && win && appBase && new URL(win.webContents.getURL() || appBase).pathname === "/")
     void win.loadURL(`${appBase}${profilePath(next)}`);
 });
+
+/* ---------- LP por partida ---------- */
+
+// Se guardan en la carpeta de datos de la app: Riot no los entrega, así que no se pueden recuperar después.
+const lpFile = () => join(app.getPath("userData"), "lp.json");
+
+function readLpChanges(): Record<string, LpChange> {
+  try {
+    return JSON.parse(readFileSync(lpFile(), "utf8")) as Record<string, LpChange>;
+  } catch {
+    return {};
+  }
+}
+
+league.onLpChange = (change) => {
+  // Las 500 más nuevas alcanzan de sobra para el historial.
+  const all = Object.values({ ...readLpChanges(), [change.matchId]: change })
+    .sort((a, b) => b.at - a.at)
+    .slice(0, 500);
+  try {
+    writeFileSync(lpFile(), JSON.stringify(Object.fromEntries(all.map((c) => [c.matchId, c]))));
+  } catch {
+    // si no se puede guardar, igual se muestra mientras la app siga abierta
+  }
+  win?.webContents.send("lp:changed", change);
+};
+
+ipcMain.handle("lp:get", () => readLpChanges());
 
 ipcMain.handle("account:get", () => account);
 

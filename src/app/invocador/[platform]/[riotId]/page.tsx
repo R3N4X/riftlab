@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import Link from "next/link";
 import { notFound } from "next/navigation";
 import { connection } from "next/server";
-import { Suspense } from "react";
+import { Fragment, Suspense } from "react";
 import { ChampIcon, RankCrest, RoleIcon, SpellIcon } from "@/components/icons";
 import { MatchCard, type MatchCardData } from "@/components/match-card";
 import { ProfileHighlights, RecentForm } from "@/components/profile-highlights";
@@ -14,6 +14,8 @@ import { getChampionList, getChampionsByKey, getItems, getLatestVersion, getRune
 import { rememberPlayers } from "@/lib/players";
 import { kda, nameWidth, pct, timeAgo, wrClass } from "@/lib/format";
 import { parseString } from "@/lib/params";
+import { sortByLane } from "@/lib/lanes";
+import { getChampionRoleGames } from "@/lib/stats";
 import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
 import {
@@ -452,9 +454,37 @@ function RankedCard({ title, entry }: { title: string; entry?: LeagueEntry }) {
   );
 }
 
-function LiveGame({ game, data }: { game: ActiveGame; data: MatchCardData }) {
+async function LiveGame({ game, data }: { game: ActiveGame; data: MatchCardData }) {
   const { version, champsByKey, spells, platform } = data;
   const minutes = Math.floor(game.gameLength / 60);
+  const teams = [100, 200].map((teamId) => game.participants.filter((p) => p.teamId === teamId));
+  // En la Grieta se ordena cada equipo por línea, para ver a cada uno frente a su rival.
+  const roleGames = game.gameMode === "CLASSIC" ? await getChampionRoleGames() : null;
+  const [blue, red] = teams.map((t) => (roleGames ? sortByLane(t, roleGames) : t.map((player) => ({ player, role: null }))));
+  const byLane = blue.every((b) => b.role) && red.every((r) => r.role);
+
+  const player = (p: ActiveGame["participants"][number], side: "left" | "right") => {
+    const champ = champsByKey[p.championId];
+    const [name, tag] = (p.riotId ?? "").split("#");
+    return (
+      <div className={`flex min-w-0 items-center gap-2 text-sm ${side === "right" ? "flex-row-reverse text-right" : ""}`}>
+        {champ && <ChampIcon version={version} id={champ.id} name={champ.name} size={32} />}
+        <span className="flex shrink-0 flex-col gap-0.5">
+          {[p.spell1Id, p.spell2Id].map((s) =>
+            spells[s] ? <SpellIcon key={s} version={version} file={spells[s].image.full} name={spells[s].name} size={14} /> : null,
+          )}
+        </span>
+        {name && tag ? (
+          <Link href={`/invocador/${platform}/${riotIdToSlug(name, tag)}`} className="truncate hover:text-gold-soft">
+            {name}
+          </Link>
+        ) : (
+          <span className="truncate text-muted">{champ?.name}</span>
+        )}
+      </div>
+    );
+  };
+
   return (
     <Panel className="border-win/40 p-5">
       <h2 className="mb-4 font-display text-2xl font-semibold">
@@ -463,38 +493,35 @@ function LiveGame({ game, data }: { game: ActiveGame; data: MatchCardData }) {
           {QUEUES[game.gameQueueConfigId] ?? game.gameMode}, minuto {Math.max(0, minutes)}
         </span>
       </h2>
-      <div className="grid gap-4 md:grid-cols-2">
-        {[100, 200].map((teamId) => (
-          <ul key={teamId} className="space-y-1.5">
-            <li className={`text-sm ${teamId === 100 ? "text-hex" : "text-loss"}`}>{teamId === 100 ? "Equipo azul" : "Equipo rojo"}</li>
-            {game.participants
-              .filter((p) => p.teamId === teamId)
-              .map((p) => {
-                const champ = champsByKey[p.championId];
-                const [name, tag] = (p.riotId ?? "").split("#");
-                return (
-                  <li key={p.puuid} className="flex items-center gap-2 text-sm">
-                    {champ && <ChampIcon version={version} id={champ.id} name={champ.name} size={32} />}
-                    <span className="flex flex-col gap-0.5">
-                      {[p.spell1Id, p.spell2Id].map((s) =>
-                        spells[s] ? (
-                          <SpellIcon key={s} version={version} file={spells[s].image.full} name={spells[s].name} size={14} />
-                        ) : null,
-                      )}
-                    </span>
-                    {name && tag ? (
-                      <Link href={`/invocador/${platform}/${riotIdToSlug(name, tag)}`} className="truncate hover:text-gold-soft">
-                        {name}
-                      </Link>
-                    ) : (
-                      <span className="text-muted">{champ?.name}</span>
-                    )}
-                  </li>
-                );
-              })}
-          </ul>
-        ))}
-      </div>
+      {byLane ? (
+        <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
+          <p className="text-sm text-hex">Equipo azul</p>
+          <span />
+          <p className="text-right text-sm text-loss">Equipo rojo</p>
+          {blue.map((b, i) => (
+            <Fragment key={b.player.puuid}>
+              {player(b.player, "left")}
+              <span title={ROLE_LABEL[b.role!]} className="flex justify-center">
+                <RoleIcon role={b.role!} size={18} className="opacity-60" />
+                <span className="sr-only">{ROLE_LABEL[b.role!]}</span>
+              </span>
+              {player(red[i].player, "right")}
+            </Fragment>
+          ))}
+          <p className="col-span-3 mt-2 text-xs text-dim">Las líneas son una estimación según el campeón y si lleva Aplastar.</p>
+        </div>
+      ) : (
+        <div className="grid gap-4 md:grid-cols-2">
+          {[blue, red].map((team, i) => (
+            <ul key={i} className="space-y-1.5">
+              <li className={`text-sm ${i === 0 ? "text-hex" : "text-loss"}`}>{i === 0 ? "Equipo azul" : "Equipo rojo"}</li>
+              {team.map(({ player: p }) => (
+                <li key={p.puuid}>{player(p, "left")}</li>
+              ))}
+            </ul>
+          ))}
+        </div>
+      )}
     </Panel>
   );
 }

@@ -8,7 +8,8 @@
  * cerca del límite. Solo se pide una vez por partida.
  */
 import { cacheLife } from "next/cache";
-import type { Platform, Tier } from "./constants";
+import type { Platform, Role, Tier } from "./constants";
+import { sortByLane } from "./lanes";
 import {
   getActiveGame,
   getChampionMastery,
@@ -20,6 +21,7 @@ import {
   type LeagueEntry,
   type Match,
 } from "./riot";
+import { getChampionRoleGames } from "./stats";
 
 export interface LiveRecentGame {
   win: boolean;
@@ -53,6 +55,8 @@ export interface LivePlayerInfo {
   mastery: { level: number; points: number; lastPlayTime: number } | null;
   /** Últimas partidas (de la más nueva a la más vieja); null si no se pudieron pedir. */
   recent: LiveRecentGame[] | null;
+  /** Línea estimada (solo en la Grieta); los equipos vienen ordenados de Superior a Soporte. */
+  role: Role | null;
 }
 
 export interface LiveGameInfo {
@@ -140,9 +144,21 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
         rankQueue: entry?.queueType ?? null,
         mastery: mastery ? { level: mastery.championLevel, points: mastery.championPoints, lastPlayTime: mastery.lastPlayTime } : null,
         recent,
+        role: null,
       };
     }),
   );
+
+  // En la Grieta cada equipo se ordena por línea: así cada jugador queda frente a su rival.
+  if (game.gameMode === "CLASSIC") {
+    const roleGames = await getChampionRoleGames().catch(() => null);
+    if (roleGames) {
+      const sorted = [100, 200].flatMap((teamId) =>
+        sortByLane(players.filter((p) => p.teamId === teamId), roleGames).map(({ player, role }) => ({ ...player, role })),
+      );
+      if (sorted.length === players.length) players.splice(0, players.length, ...sorted);
+    }
+  }
 
   return { gameId: game.gameId, queueId: game.gameQueueConfigId, startedAt: game.gameStartTime, players };
 }

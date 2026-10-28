@@ -359,6 +359,23 @@ export async function getTierList(rank: RankFilter, role: Role | "ALL" = "ALL"):
   return filtered.sort((a, b) => b.score - a.score);
 }
 
+/** Partidas de cada campeón (key) en cada rol, todas las divisiones. Sirve para adivinar líneas en partidas en curso. */
+export async function getChampionRoleGames(): Promise<Record<string, Partial<Record<Role, number>>>> {
+  "use cache";
+  cacheLife("hours");
+  const ds = await loadDataset();
+  const out: Record<string, Partial<Record<Role, number>>> = {};
+  for (const [key, agg] of Object.entries(ds.champions)) {
+    const roles: Partial<Record<Role, number>> = {};
+    for (const role of ROLES) {
+      const games = sumTiers(agg.roles[role]?.byTier, "ALL").games;
+      if (games > 0) roles[role] = games;
+    }
+    out[key] = roles;
+  }
+  return out;
+}
+
 /* ---------- Campeón ---------- */
 
 export interface ChampionRoleOption {

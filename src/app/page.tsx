@@ -4,7 +4,7 @@ import { ChampIcon, RoleIcon, TierBadge } from "@/components/icons";
 import { SummonerSearch } from "@/components/summoner-search";
 import { DataSourceNote, Panel, Section, Skeleton } from "@/components/ui";
 import { DEFAULT_RANK, RANK_FILTERS, ROLE_LABEL, ROLES } from "@/lib/constants";
-import { getChampionsByKey, getLatestVersion, img, versionToPatch } from "@/lib/ddragon";
+import { getChampionList, getChampionsByKey, getLatestVersion, img, versionToPatch } from "@/lib/ddragon";
 import { dateLabel, pct, wrClass } from "@/lib/format";
 import { getPatchNotesList } from "@/lib/patchnotes";
 import { getBotlaneDuos, getTierList } from "@/lib/stats";
@@ -14,6 +14,7 @@ export default async function HomePage() {
   const patch = versionToPatch(version);
   const tier = await getTierList(DEFAULT_RANK);
   const hero = tier[0];
+  const champions = (await getChampionList(version)).map((c) => ({ id: c.id, name: c.name }));
 
   return (
     <>
@@ -31,10 +32,10 @@ export default async function HomePage() {
             Todo lo que necesitas antes de entrar a la Grieta.
           </h1>
           <p className="mt-4 max-w-xl text-lg text-muted">
-            Busca a cualquier jugador por su Riot ID, revisa la tier list del parche {patch} y copia la build que más gana.
+            Busca a cualquier jugador por su Riot ID o un campeón, revisa la tier list del parche {patch} y copia la build que más gana.
           </p>
           <div className="mt-8 max-w-2xl">
-            <SummonerSearch />
+            <SummonerSearch champions={champions} version={version} />
           </div>
           {hero && (
             <p className="mt-6 text-sm text-muted">

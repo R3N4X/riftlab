@@ -4,17 +4,25 @@ import { useRouter } from "next/navigation";
 import { useId, useState } from "react";
 import { PLATFORMS, type Platform } from "@/lib/constants";
 import { usePreferredPlatform } from "@/lib/preferences";
-import { Highlight, usePlayerSuggestions } from "./search-suggestions";
+import { SearchResultsList, useSearchResults, type SearchChampion } from "./global-search";
 
+/**
+ * Buscador con servidor a la vista. Con `champions` busca lo mismo que el de la barra lateral
+ * (campeones y perfiles); sin ellos, solo perfiles (por ejemplo, para comparar).
+ */
 export function SummonerSearch({
   size = "lg",
   defaultPlatform,
   compareWith,
+  champions,
+  version,
 }: {
   size?: "lg" | "sm";
   defaultPlatform?: Platform;
   /** "la2:Nombre-TAG": en vez de abrir el perfil, abre la comparación con ese jugador. */
   compareWith?: string;
+  champions?: SearchChampion[];
+  version?: string;
 }) {
   const router = useRouter();
   const preferred = usePreferredPlatform();
@@ -24,15 +32,16 @@ export function SummonerSearch({
   const [query, setQuery] = useState("");
   const [error, setError] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(-1);
+  const [active, setActive] = useState(0);
   const listId = useId();
-  const players = usePlayerSuggestions(query, platform);
-  const showList = open && players.length > 0;
+  const withChampions = Boolean(champions && version);
+  const results = useSearchResults(query, platform, champions, version);
+  const showList = open && query.trim().length > 0 && (withChampions || results.length > 0);
 
   function goTo(href: string) {
     setOpen(false);
     setQuery("");
-    router.push(target(href));
+    router.push(href.startsWith("/invocador/") ? target(href) : href);
   }
 
   /** "/invocador/la2/Nombre-TAG" → la comparación, si este buscador es para comparar. */
@@ -46,10 +55,10 @@ export function SummonerSearch({
     if (!showList) return;
     if (e.key === "ArrowDown") {
       e.preventDefault();
-      setActive((i) => Math.min(i + 1, players.length - 1));
+      setActive((i) => Math.min(i + 1, results.length - 1));
     } else if (e.key === "ArrowUp") {
       e.preventDefault();
-      setActive((i) => Math.max(i - 1, -1));
+      setActive((i) => Math.max(i - 1, 0));
     } else if (e.key === "Escape") {
       setOpen(false);
     }
@@ -57,12 +66,20 @@ export function SummonerSearch({
 
   function submit(e: React.FormEvent) {
     e.preventDefault();
-    // Con una sugerencia marcada (flechas), Enter abre ese perfil.
-    if (showList && active >= 0 && players[active]) return goTo(players[active].href);
+    // Enter abre el resultado marcado (el primero, si no se movió con las flechas).
+    const picked = results[active];
+    if (open && picked) {
+      setError(null);
+      return goTo(picked.href);
+    }
     const value = query.trim();
     const idx = value.lastIndexOf("#");
     if (idx <= 0 || idx === value.length - 1) {
-      setError("Escribe el Riot ID completo, con el tag: Nombre#LAN");
+      setError(
+        withChampions
+          ? "Escribe un campeón o el Riot ID completo, con el tag: Nombre#LAN"
+          : "Escribe el Riot ID completo, con el tag: Nombre#LAN",
+      );
       return;
     }
     setError(null);
@@ -92,7 +109,7 @@ export function SummonerSearch({
           ))}
         </select>
         <label className="sr-only" htmlFor={`riotid-${size}`}>
-          Riot ID
+          {withChampions ? "Campeón o Riot ID" : "Riot ID"}
         </label>
         <input
           id={`riotid-${size}`}
@@ -100,7 +117,8 @@ export function SummonerSearch({
           onChange={(e) => {
             setQuery(e.target.value);
             setOpen(true);
-            setActive(-1);
+            setActive(0);
+            setError(null);
           }}
           onFocus={() => setOpen(true)}
           onBlur={() => setTimeout(() => setOpen(false), 120)}
@@ -109,8 +127,8 @@ export function SummonerSearch({
           aria-expanded={showList}
           aria-controls={listId}
           aria-autocomplete="list"
-          aria-activedescendant={showList && active >= 0 ? `${listId}-${active}` : undefined}
-          placeholder="Nombre#TAG"
+          aria-activedescendant={showList && results[active] ? `${listId}-${active}` : undefined}
+          placeholder={withChampions ? "Campeón o Nombre#TAG" : "Nombre#TAG"}
           autoComplete="off"
           spellCheck={false}
           className={`min-w-0 flex-1 bg-transparent text-ink outline-none placeholder:text-dim ${big ? "px-4 text-lg" : "px-3 text-sm"}`}
@@ -123,41 +141,16 @@ export function SummonerSearch({
         </button>
       </div>
       {showList && (
-        <ul
+        <SearchResultsList
           id={listId}
-          role="listbox"
-          onMouseDown={(e) => {
-            const option = (e.target as HTMLElement).closest<HTMLElement>("[data-href]");
-            if (!option?.dataset.href) return;
-            e.preventDefault();
-            goTo(option.dataset.href);
-          }}
-          className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-lg border border-line bg-surface text-left shadow-lg shadow-night/60"
-        >
-          <li role="presentation" className="bg-night/40 px-3 py-1 text-[11px] font-semibold text-dim">
-            Perfiles en {PLATFORMS[platform].label}
-          </li>
-          {players.map((p, i) => (
-            <li
-              key={p.href}
-              id={`${listId}-${i}`}
-              role="option"
-              aria-selected={i === active}
-              data-href={p.href}
-              onMouseEnter={() => setActive(i)}
-              className={`flex cursor-pointer items-center gap-3 px-3 py-2 ${i === active ? "bg-raised" : ""}`}
-            >
-              <img src={p.icon} alt="" width={32} height={32} className="h-8 w-8 rounded-full" />
-              <span className="min-w-0">
-                <span className="block truncate text-sm text-ink">
-                  <Highlight text={p.gameName} query={query} />
-                  <span className="ml-1 text-dim">#{p.tagLine}</span>
-                </span>
-                <span className="block truncate text-xs text-dim">{p.detail}</span>
-              </span>
-            </li>
-          ))}
-        </ul>
+          results={results}
+          active={active}
+          query={query}
+          platform={platform}
+          onPick={(r) => goTo(r.href)}
+          onHover={setActive}
+          className={big ? "rounded-lg" : ""}
+        />
       )}
       {error && <p className="mt-2 text-sm text-loss">{error}</p>}
     </form>

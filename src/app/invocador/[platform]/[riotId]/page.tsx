@@ -10,7 +10,7 @@ import { AutoRetry, RefreshProfile } from "@/components/refresh-profile";
 import { SummonerSearch } from "@/components/summoner-search";
 import { ErrorNote, Panel, Section, Skeleton } from "@/components/ui";
 import { PLATFORMS, QUEUES, ROLE_LABEL, ROLES, TIER_LABEL, isPlatform, type Platform, type Role, type Tier } from "@/lib/constants";
-import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, getSummonerSpells, img } from "@/lib/ddragon";
+import { getChampionList, getChampionsByKey, getItems, getLatestVersion, getRuneIndex, getSummonerSpells, img } from "@/lib/ddragon";
 import { rememberPlayers } from "@/lib/players";
 import { kda, nameWidth, pct, timeAgo, wrClass } from "@/lib/format";
 import { parseString } from "@/lib/params";
@@ -62,11 +62,13 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
   if (!isPlatform(platform)) notFound();
   const id = slugToRiotId(riotId);
   if (!id) notFound();
+  const searchVersion = await getLatestVersion();
+  const searchChampions = (await getChampionList(searchVersion)).map((c) => ({ id: c.id, name: c.name }));
 
   const header = (
     <div className="border-b border-line px-4 py-4 sm:px-8">
       <div className="max-w-xl">
-        <SummonerSearch size="sm" defaultPlatform={platform} />
+        <SummonerSearch size="sm" defaultPlatform={platform} champions={searchChampions} version={searchVersion} />
       </div>
     </div>
   );

@@ -2,7 +2,7 @@
 
 import { useRouter } from "next/navigation";
 import { Fragment, useEffect, useId, useMemo, useRef, useState } from "react";
-import { PLATFORMS } from "@/lib/constants";
+import { PLATFORMS, type Platform } from "@/lib/constants";
 import { img } from "@/lib/assets";
 import { usePreferredPlatform } from "@/lib/preferences";
 import { Highlight, usePlayerSuggestions } from "./search-suggestions";
@@ -22,7 +22,7 @@ const normalize = (s: string) =>
     .toLowerCase()
     .replace(/[^a-z0-9]/g, "");
 
-interface Result {
+export interface Result {
   key: string;
   group: "Campeones" | "Invocadores";
   label: string;
@@ -34,32 +34,13 @@ interface Result {
 }
 
 /**
- * Buscador único de la app: escribe un campeón ("soraka") para ir a su página
- * o un Riot ID ("Nombre#TAG") para abrir el perfil. Ctrl+K lo enfoca.
+ * Resultados del buscador: campeones (si se pasan) y perfiles del servidor elegido.
+ * Lo comparten el buscador de la barra lateral y el de perfiles.
  */
-export function GlobalSearch({ champions, version }: { champions: SearchChampion[]; version: string }) {
-  const router = useRouter();
-  const inputRef = useRef<HTMLInputElement>(null);
-  const listId = useId();
-  const [query, setQuery] = useState("");
-  const [open, setOpen] = useState(false);
-  const [active, setActive] = useState(0);
-  const platform = usePreferredPlatform();
-
-  useEffect(() => {
-    const onKey = (e: KeyboardEvent) => {
-      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
-        e.preventDefault();
-        inputRef.current?.focus();
-      }
-    };
-    window.addEventListener("keydown", onKey);
-    return () => window.removeEventListener("keydown", onKey);
-  }, []);
-
+export function useSearchResults(query: string, platform: Platform, champions: SearchChampion[] | undefined, version: string | undefined) {
   const players = usePlayerSuggestions(query, platform);
 
-  const results = useMemo<Result[]>(() => {
+  return useMemo<Result[]>(() => {
     const q = query.trim();
     if (!q) return [];
     const out: Result[] = [];
@@ -75,7 +56,7 @@ export function GlobalSearch({ champions, version }: { champions: SearchChampion
         href: `/invocador/${platform}/${slug}`,
       });
     }
-    if (hash < 0) {
+    if (hash < 0 && champions && version) {
       const nq = normalize(q);
       out.push(
         ...champions
@@ -105,6 +86,113 @@ export function GlobalSearch({ champions, version }: { champions: SearchChampion
     }
     return out;
   }, [query, champions, version, platform, players]);
+}
+
+/** Lista desplegable de resultados, agrupada en campeones y perfiles. */
+export function SearchResultsList({
+  id,
+  results,
+  active,
+  query,
+  platform,
+  onPick,
+  onHover,
+  className = "",
+}: {
+  id: string;
+  results: Result[];
+  active: number;
+  query: string;
+  platform: Platform;
+  onPick: (r: Result) => void;
+  onHover: (i: number) => void;
+  className?: string;
+}) {
+  return (
+    <ul
+      id={id}
+      role="listbox"
+      onMouseDown={(e) => {
+        // Un solo manejador para toda la lista: la opción se identifica por data-index.
+        const option = (e.target as HTMLElement).closest<HTMLElement>("[data-index]");
+        if (!option) return;
+        e.preventDefault();
+        onPick(results[Number(option.dataset.index)]);
+      }}
+      className={`absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-md border border-line bg-surface text-left shadow-lg shadow-night/60 ${className}`}
+    >
+      {results.length === 0 ? (
+        <li className="px-3 py-2 text-sm text-muted">Sin coincidencias. Para un jugador que aún no aparece, escribe su Nombre#TAG.</li>
+      ) : (
+        results.map((r, i) => (
+          <Fragment key={r.key}>
+            {r.group !== results[i - 1]?.group && (
+              <li
+                role="presentation"
+                className="border-t border-line/60 bg-night/40 px-3 py-1 text-[11px] font-semibold text-dim first:border-t-0"
+              >
+                {r.group === "Campeones" ? "Builds de campeones" : `Perfiles en ${PLATFORMS[platform].label}`}
+              </li>
+            )}
+            <li
+              id={`${id}-${i}`}
+              role="option"
+              aria-selected={i === active}
+              data-index={i}
+              onMouseEnter={() => onHover(i)}
+              className={`flex cursor-pointer items-center gap-3 px-3 py-2 ${i === active ? "bg-raised" : ""}`}
+            >
+              {r.icon ? (
+                <img
+                  src={r.icon}
+                  alt=""
+                  width={28}
+                  height={28}
+                  className={`h-7 w-7 ${r.group === "Invocadores" ? "rounded-full" : "rounded"}`}
+                />
+              ) : (
+                <span className="flex h-7 w-7 items-center justify-center rounded-full bg-raised text-xs text-gold-soft">#</span>
+              )}
+              <span className="min-w-0">
+                <span className="block truncate text-sm text-ink">
+                  <Highlight text={r.label} query={query} />
+                  {r.tag && <span className="ml-1 text-dim">{r.tag}</span>}
+                </span>
+                <span className="block truncate text-xs text-dim">{r.hint}</span>
+              </span>
+            </li>
+          </Fragment>
+        ))
+      )}
+    </ul>
+  );
+}
+
+/**
+ * Buscador único de la app: escribe un campeón ("soraka") para ir a su página
+ * o un Riot ID ("Nombre#TAG") para abrir el perfil. Ctrl+K lo enfoca.
+ */
+export function GlobalSearch({ champions, version }: { champions: SearchChampion[]; version: string }) {
+  const router = useRouter();
+  const inputRef = useRef<HTMLInputElement>(null);
+  const listId = useId();
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState(false);
+  const [active, setActive] = useState(0);
+  const platform = usePreferredPlatform();
+
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if ((e.ctrlKey || e.metaKey) && e.key.toLowerCase() === "k") {
+        e.preventDefault();
+        inputRef.current?.focus();
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, []);
+
+  const results = useSearchResults(query, platform, champions, version);
 
   function go(r: Result | undefined) {
     if (!r) return;
@@ -161,62 +249,15 @@ export function GlobalSearch({ champions, version }: { champions: SearchChampion
         className="h-9 w-full rounded-md border border-line bg-night px-3 text-sm outline-none placeholder:text-dim focus:border-gold"
       />
       {showList && (
-        <ul
+        <SearchResultsList
           id={listId}
-          role="listbox"
-          onMouseDown={(e) => {
-            // Un solo manejador para toda la lista: la opción se identifica por data-index.
-            const option = (e.target as HTMLElement).closest<HTMLElement>("[data-index]");
-            if (!option) return;
-            e.preventDefault();
-            go(results[Number(option.dataset.index)]);
-          }}
-          className="absolute inset-x-0 top-full z-40 mt-1 overflow-hidden rounded-md border border-line bg-surface shadow-lg shadow-night/60"
-        >
-          {results.length === 0 ? (
-            <li className="px-3 py-2 text-sm text-muted">Sin coincidencias. Para un jugador que aún no aparece, escribe su Nombre#TAG.</li>
-          ) : (
-            results.map((r, i) => (
-              <Fragment key={r.key}>
-                {r.group !== results[i - 1]?.group && (
-                  <li
-                    role="presentation"
-                    className="border-t border-line/60 bg-night/40 px-3 py-1 text-[11px] font-semibold text-dim first:border-t-0"
-                  >
-                    {r.group === "Campeones" ? "Builds de campeones" : `Perfiles en ${PLATFORMS[platform].label}`}
-                  </li>
-                )}
-                <li
-                  id={`${listId}-${i}`}
-                  role="option"
-                  aria-selected={i === active}
-                  data-index={i}
-                  onMouseEnter={() => setActive(i)}
-                  className={`flex cursor-pointer items-center gap-3 px-3 py-2 ${i === active ? "bg-raised" : ""}`}
-                >
-                  {r.icon ? (
-                    <img
-                      src={r.icon}
-                      alt=""
-                      width={28}
-                      height={28}
-                      className={`h-7 w-7 ${r.group === "Invocadores" ? "rounded-full" : "rounded"}`}
-                    />
-                  ) : (
-                    <span className="flex h-7 w-7 items-center justify-center rounded-full bg-raised text-xs text-gold-soft">#</span>
-                  )}
-                  <span className="min-w-0">
-                    <span className="block truncate text-sm text-ink">
-                      <Highlight text={r.label} query={query} />
-                      {r.tag && <span className="ml-1 text-dim">{r.tag}</span>}
-                    </span>
-                    <span className="block truncate text-xs text-dim">{r.hint}</span>
-                  </span>
-                </li>
-              </Fragment>
-            ))
-          )}
-        </ul>
+          results={results}
+          active={active}
+          query={query}
+          platform={platform}
+          onPick={go}
+          onHover={setActive}
+        />
       )}
     </div>
   );

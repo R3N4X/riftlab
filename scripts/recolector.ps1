@@ -2,7 +2,7 @@
 # 3 horas. Lo arranca el Programador de tareas de Windows (tarea "RiftLab recolector") al iniciar sesión
 # y cada hora por si se detuvo; corre oculto, sin depender de la app ni de ninguna terminal.
 # Avance: logs\recolector.log en la carpeta del proyecto (fuera de AppData, para que también se pueda
-# leer desde la app de Claude, que ve una copia propia de AppData).
+# leer desde el asistente de programación, que ve una copia propia de AppData).
 # Para detenerlo: finalizar la tarea en el Programador de tareas; para que no arranque más, deshabilitarla.
 
 $root = Split-Path -Parent $PSScriptRoot

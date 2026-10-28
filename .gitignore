@@ -48,9 +48,6 @@ next-env.d.ts
 /desktop/dist
 /dist-installer
 
-# configuración local de las herramientas
-/.claude
-
 # datos generados: se arman con npm run aggregate (el índice de jugadores tiene Riot ID de terceros)
 /data/
 

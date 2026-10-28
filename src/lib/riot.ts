@@ -170,6 +170,8 @@ export interface ChampionMastery {
   championLevel: number;
   championPoints: number;
   lastPlayTime: number;
+  championPointsSinceLastLevel?: number;
+  championPointsUntilNextLevel?: number;
 }
 
 export interface MatchParticipant {
@@ -316,6 +318,16 @@ export async function getLeagueEntries(platform: Platform, puuid: string) {
 
 export async function getTopMasteries(platform: Platform, puuid: string, count = 10) {
   return riotFetch<ChampionMastery[]>(platform, `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}/top?count=${count}`);
+}
+
+/** Maestría con todos los campeones que jugó alguna vez, de más a menos puntos. */
+export async function getAllMasteries(platform: Platform, puuid: string) {
+  return riotFetch<ChampionMastery[]>(platform, `/lol/champion-mastery/v4/champion-masteries/by-puuid/${puuid}`);
+}
+
+/** Puntaje de maestría: la suma de los niveles de todos sus campeones. */
+export async function getMasteryScore(platform: Platform, puuid: string) {
+  return riotFetch<number>(platform, `/lol/champion-mastery/v4/scores/by-puuid/${puuid}`);
 }
 
 /** Maestría con un campeón; null si nunca lo jugó. */

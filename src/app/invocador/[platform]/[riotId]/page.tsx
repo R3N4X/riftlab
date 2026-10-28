@@ -198,7 +198,15 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
 
             {masteries.length > 0 && (
               <Panel className="p-4">
-                <h2 className="mb-3 font-display text-xl font-semibold">Maestría</h2>
+                <div className="mb-3 flex items-baseline justify-between gap-3">
+                  <h2 className="font-display text-xl font-semibold">Maestría</h2>
+                  <Link
+                    href={`/invocador/${platform}/${riotIdToSlug(account.gameName, account.tagLine)}/maestria`}
+                    className="text-sm text-gold-soft hover:underline"
+                  >
+                    Ver todas
+                  </Link>
+                </div>
                 <ul className="grid grid-cols-4 gap-3">
                   {masteries.map((m) => {
                     const champ = champsByKey[m.championId];

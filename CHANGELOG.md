@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.12 (28-10-2026)
+
+- Nueva página de maestría de cada jugador (botón "Ver todas" en el perfil): puntaje de maestría, puntos totales, campeones con maestría y todos los campeones con su nivel, puntos, avance al siguiente nivel y última vez jugado. Se puede ordenar y buscar, y abajo aparecen los campeones sin jugar.
+
 ## 0.2.11 (28-10-2026)
 
 - En el historial, las clasificatorias muestran los LP que ganaste o perdiste junto a "Victoria" o "Derrota". Se registran desde ahora, en las partidas que juegues con RiftLab abierta (Riot no entrega los LP de partidas anteriores).

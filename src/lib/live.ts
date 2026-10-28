@@ -141,6 +141,8 @@ export interface DesktopSettings {
   flashKey: "D" | "F" | null;
   /** Ya pasó por la configuración inicial (o la saltó). */
   setupDone: boolean;
+  /** Traer la ventana al frente (en En vivo) al entrar a la selección de campeones. */
+  focusOnChampSelect: boolean;
 }
 
 export interface AutoImportParts {
@@ -153,7 +155,15 @@ export interface AutoImportParts {
 export type SettingsPatch = Partial<
   Pick<
     DesktopSettings,
-    "openAtLogin" | "openOnProfile" | "tftOverlay" | "autoImport" | "autoImportParts" | "games" | "flashKey" | "setupDone"
+    | "openAtLogin"
+    | "openOnProfile"
+    | "tftOverlay"
+    | "autoImport"
+    | "autoImportParts"
+    | "games"
+    | "flashKey"
+    | "setupDone"
+    | "focusOnChampSelect"
   >
 >;
 

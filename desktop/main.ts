@@ -102,6 +102,7 @@ interface StoredSettings {
   games?: DesktopSettings["games"];
   flashKey?: "D" | "F";
   setupDone?: boolean;
+  focusOnChampSelect?: boolean;
   /** Dirección de las actualizaciones automáticas (carpeta con latest.yml). */
   updateUrl?: string;
 }
@@ -140,6 +141,7 @@ function currentSettings(): DesktopSettings {
     games: stored.games === "lol" ? "lol" : "lol-tft",
     flashKey: stored.flashKey === "D" || stored.flashKey === "F" ? stored.flashKey : null,
     setupDone: stored.setupDone ?? false,
+    focusOnChampSelect: stored.focusOnChampSelect ?? true,
   };
 }
 
@@ -469,9 +471,29 @@ function toggleOverlay(): boolean {
 
 let lastTft = false;
 
+let lastPhase = "";
+
+/**
+ * Trae la ventana principal al frente. Windows no deja que una app le quite el foco a otra, así que
+ * se pone encima de todo un instante y se suelta.
+ */
+function bringToFront() {
+  if (!win) return;
+  if (win.isMinimized()) win.restore();
+  win.show();
+  win.setAlwaysOnTop(true);
+  win.moveTop();
+  win.focus();
+  setTimeout(() => win?.setAlwaysOnTop(false), 400);
+}
+
 const league = new LeagueClient((state) => {
   win?.webContents.send("live:state", state);
   overlay?.webContents.send("live:state", state);
+
+  // Al entrar a la selección de campeones la ventana pasa al frente; la página salta sola a En vivo.
+  if (state.phase === "ChampSelect" && lastPhase !== "ChampSelect" && currentSettings().focusOnChampSelect) bringToFront();
+  lastPhase = state.phase;
 
   // La flotante se abre al empezar una partida de TFT y se cierra al terminar.
   const settings = currentSettings();
@@ -560,6 +582,7 @@ ipcMain.handle("settings:set", (_e, patch: SettingsPatch) => {
   if (patch?.flashKey === "D" || patch?.flashKey === "F") next.flashKey = patch.flashKey;
   else if (patch?.flashKey === null) delete next.flashKey;
   if (typeof patch?.setupDone === "boolean") next.setupDone = patch.setupDone;
+  if (typeof patch?.focusOnChampSelect === "boolean") next.focusOnChampSelect = patch.focusOnChampSelect;
   writeSettings(next);
   return applySettings();
 });

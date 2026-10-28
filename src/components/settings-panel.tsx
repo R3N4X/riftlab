@@ -327,6 +327,15 @@ function ChampSelectSection({ settings }: { settings: DesktopSettings }) {
         onChange={(v) => void updateDesktopSettings({ flashKey: v === "cliente" ? null : v })}
       />
 
+      <div className="mt-5 border-t border-line pt-4">
+        <Toggle
+          label="Traer RiftLab al frente al entrar a la selección"
+          hint="La ventana aparece sobre el cliente de League, en En vivo, con los picks y la build recomendada."
+          checked={settings.focusOnChampSelect}
+          onChange={(focusOnChampSelect) => void updateDesktopSettings({ focusOnChampSelect })}
+        />
+      </div>
+
       <div className="mt-5 space-y-3 border-t border-line pt-4">
         <Toggle
           label="Importar la build sola al bloquear el campeón"

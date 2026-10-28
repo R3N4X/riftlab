@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.13 (28-10-2026)
+
+- Al entrar a la selección de campeones, RiftLab pasa al frente sola y abre En vivo, con los picks y la build recomendada. Se puede apagar en Ajustes → Selección de campeones.
+
 ## 0.2.12 (28-10-2026)
 
 - Nueva página de maestría de cada jugador (botón "Ver todas" en el perfil): puntaje de maestría, puntos totales, campeones con maestría y todos los campeones con su nivel, puntos, avance al siguiente nivel y última vez jugado. Se puede ordenar y buscar, y abajo aparecen los campeones sin jugar.

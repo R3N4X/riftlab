@@ -76,7 +76,8 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
     getSummonerSpells(),
   ]);
   const me = myKey ? champs[myKey] : undefined;
-  const empty = !myKey && !allies.length && !enemies.length;
+  // Con solo la línea (por ejemplo, al elegir primero) ya se pueden recomendar picks.
+  const empty = !myKey && !myRole && !allies.length && !enemies.length;
   // Lo justo para la pantalla de carga (componente de cliente).
   const slimChamps = Object.fromEntries(Object.entries(champs).map(([k, c]) => [k, { id: c.id, name: c.name }]));
   const slimSpells = Object.fromEntries(Object.entries(spells).map(([k, sp]) => [k, { file: sp.image.full, name: sp.name }]));

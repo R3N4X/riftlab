@@ -2,6 +2,11 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.14 (29-10-2026)
+
+- En vivo recomienda picks para tu línea desde el primer momento de la selección, aunque nadie haya elegido todavía (por ejemplo, si eliges primero).
+- Al entrar a la selección, RiftLab abre En vivo aunque la ventana estuviera en segundo plano (antes a veces quedaba en tu perfil).
+
 ## 0.2.13 (28-10-2026)
 
 - Al entrar a la selección de campeones, RiftLab pasa al frente sola y abre En vivo, con los picks y la build recomendada. Se puede apagar en Ajustes → Selección de campeones.

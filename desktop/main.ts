@@ -492,7 +492,15 @@ const league = new LeagueClient((state) => {
   overlay?.webContents.send("live:state", state);
 
   // Al entrar a la selección de campeones la ventana pasa al frente; la página salta sola a En vivo.
-  if (state.phase === "ChampSelect" && lastPhase !== "ChampSelect" && currentSettings().focusOnChampSelect) bringToFront();
+  if (state.phase === "ChampSelect" && lastPhase !== "ChampSelect" && currentSettings().focusOnChampSelect) {
+    bringToFront();
+    // Respaldo: con la ventana en segundo plano la página a veces no alcanza a cambiar sola.
+    setTimeout(() => {
+      if (!win || !appBase || league.state.phase !== "ChampSelect") return;
+      const current = win.webContents.getURL();
+      if (!current.startsWith(appBase) || new URL(current).pathname !== "/en-vivo") void win.loadURL(`${appBase}/en-vivo`);
+    }, 2000);
+  }
   lastPhase = state.phase;
 
   // La flotante se abre al empezar una partida de TFT y se cierra al terminar.

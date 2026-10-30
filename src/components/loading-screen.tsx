@@ -9,10 +9,10 @@
 import Link from "next/link";
 import { useEffect, useState } from "react";
 import { img } from "@/lib/assets";
-import { TIER_LABEL, type Tier } from "@/lib/constants";
+import { ROLE_LABEL, ROLES, TIER_LABEL, type Tier } from "@/lib/constants";
 import { compact } from "@/lib/format";
 import type { LiveGameInfo, LivePlayerInfo } from "@/lib/live-players";
-import { RankCrest } from "./icons";
+import { RankCrest, RoleIcon } from "./icons";
 import { useLiveState } from "./live-client";
 
 type Champs = Record<string, { id: string; name: string }>;
@@ -88,7 +88,16 @@ export function LoadingScreen({
   const { players } = current.info;
   const me = players.find((p) => p.isMe);
   const myTeam = me?.teamId ?? 100;
-  const teams = [players.filter((p) => p.teamId === myTeam), players.filter((p) => p.teamId !== myTeam)];
+  // En tu propia partida el cliente sabe la línea real de tu equipo; la del rival es una estimación.
+  const assigned = new Map(
+    preview ? [] : (state?.game?.myTeam ?? []).filter((x) => x.position).map((x) => [x.championId, x.position!] as const),
+  );
+  const withLane = (p: LivePlayerInfo, ally: boolean): LivePlayerInfo => ({ ...p, role: (ally && assigned.get(p.championId)) || p.role });
+  const byLane = (a: LivePlayerInfo, b: LivePlayerInfo) => (a.role && b.role ? ROLES.indexOf(a.role) - ROLES.indexOf(b.role) : 0);
+  const teams = [
+    players.filter((p) => p.teamId === myTeam).map((p) => withLane(p, true)).sort(byLane),
+    players.filter((p) => p.teamId !== myTeam).map((p) => withLane(p, false)),
+  ];
 
   return (
     <section className="space-y-3" aria-label="Jugadores de la partida">
@@ -180,11 +189,17 @@ function PlayerCard({
   const games = p.rank ? p.rank.wins + p.rank.losses : 0;
   const wr = p.rank ? p.rank.wins / Math.max(1, games) : 0;
   const flags = flagsFor(p, champ?.name ?? "el campeón");
+  const main = p.mainRole;
+  // Autofill: juega una línea distinta de la que más juega, y esa línea es clara (al menos la mitad de su juego).
+  const autofill = Boolean(p.role && main && main.role !== p.role && main.share >= 0.5);
   return (
-    <li className={`overflow-hidden rounded-lg border bg-surface ${p.isMe ? "border-gold/70" : ally ? "border-hex/30" : "border-loss/30"}`}>
-      <div className="relative h-24">
-        {champ && <img src={img.loading(champ.id)} alt="" className="h-full w-full object-cover object-[50%_20%]" loading="lazy" />}
-        <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/30 to-transparent" />
+    <li
+      className={`flex flex-col overflow-hidden rounded-lg border bg-surface ${p.isMe ? "border-gold/70" : ally ? "border-hex/30" : "border-loss/30"}`}
+    >
+      {/* Splash horizontal: la cara del campeón queda dentro del recuadro. */}
+      <div className="relative h-28">
+        {champ && <img src={img.splash(champ.id)} alt="" className="h-full w-full object-cover object-[50%_28%]" loading="lazy" />}
+        <div className="absolute inset-0 bg-gradient-to-t from-surface via-surface/20 to-transparent" />
         <div className="absolute top-1.5 left-1.5 flex gap-0.5">
           {[p.spell1Id, p.spell2Id].map((s) =>
             spells[s] ? (
@@ -193,58 +208,110 @@ function PlayerCard({
                 src={img.spell(version, spells[s].file)}
                 alt={spells[s].name}
                 title={spells[s].name}
-                width={20}
-                height={20}
-                className="rounded"
+                width={22}
+                height={22}
+                className="rounded ring-1 ring-night/60"
               />
             ) : null,
           )}
         </div>
-        <p className="absolute bottom-1 left-2.5 font-display text-lg font-semibold drop-shadow">{champ?.name}</p>
+        {p.role && (
+          <span
+            className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-night/80 ring-1 ring-line"
+            title={`Línea en esta partida: ${ROLE_LABEL[p.role]}`}
+          >
+            <RoleIcon role={p.role} size={14} />
+          </span>
+        )}
+        <p className="absolute bottom-1 left-2.5 font-display text-lg font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
+          {champ?.name}
+        </p>
       </div>
-      <div className="space-y-1.5 px-2.5 pt-1 pb-2.5 text-xs">
+
+      <div className="flex flex-1 flex-col text-xs">
         <Link
           href={`/invocador/${platform}/${encodeURIComponent(`${p.gameName}-${p.tagLine}`)}`}
-          className={`block truncate text-sm hover:text-gold-soft ${p.isMe ? "text-gold-soft" : ""}`}
+          className={`block truncate px-2.5 pt-1 pb-2 text-sm hover:text-gold-soft ${p.isMe ? "text-gold-soft" : ""}`}
           title={`${p.gameName}#${p.tagLine}`}
         >
           {p.gameName}
           <span className="text-dim">#{p.tagLine}</span>
         </Link>
-        {p.rank ? (
-          <div className="flex items-center gap-1.5">
-            <RankCrest tier={p.rank.tier} size={20} />
-            <span className="whitespace-nowrap">
-              {TIER_LABEL[p.rank.tier] ?? p.rank.tier} {p.rank.division} · {p.rank.lp} LP
-            </span>
+
+        {/* Rango */}
+        <div className="flex items-center gap-2 border-t border-line/60 px-2.5 py-2">
+          {p.rank ? (
+            <>
+              <RankCrest tier={p.rank.tier} size={26} />
+              <div className="min-w-0 leading-tight">
+                <p className="truncate font-semibold text-ink">
+                  {TIER_LABEL[p.rank.tier] ?? p.rank.tier} {p.rank.division} · {p.rank.lp} LP
+                </p>
+                <p className="text-muted">
+                  <span className={wr >= 0.53 ? "text-win" : wr <= 0.47 ? "text-loss" : "text-ink"}>{Math.round(wr * 100)} %</span> en{" "}
+                  {games} partidas
+                </p>
+              </div>
+            </>
+          ) : (
+            <p className="text-dim">Sin clasificar</p>
+          )}
+        </div>
+
+        {/* Línea habitual y maestría */}
+        <dl className="grid grid-cols-2 gap-x-2 border-t border-line/60 px-2.5 py-2">
+          <div className="min-w-0">
+            <dt className="text-[11px] text-dim">Suele jugar</dt>
+            <dd className="flex items-center gap-1 truncate text-ink" title={main ? `${Math.round(main.share * 100)} % de su juego` : undefined}>
+              {main ? (
+                <>
+                  <RoleIcon role={main.role} size={13} />
+                  {ROLE_LABEL[main.role]}
+                  <span className="text-dim">{Math.round(main.share * 100)} %</span>
+                </>
+              ) : (
+                <span className="text-dim">Sin datos</span>
+              )}
+            </dd>
           </div>
-        ) : (
-          <p className="text-dim">Sin clasificar</p>
-        )}
-        {p.rank && (
-          <p className="text-muted">
-            <span className={wr >= 0.53 ? "text-win" : wr <= 0.47 ? "text-loss" : "text-ink"}>{Math.round(wr * 100)} %</span> en {games}{" "}
-            partidas
-          </p>
-        )}
-        <p className="text-muted">
-          {p.mastery ? `Maestría ${p.mastery.level} · ${compact(p.mastery.points)} puntos` : "Sin maestría con el campeón"}
-        </p>
+          <div className="min-w-0">
+            <dt className="text-[11px] text-dim">Maestría</dt>
+            <dd className="truncate text-ink">
+              {p.mastery ? `Nv. ${p.mastery.level} · ${compact(p.mastery.points)}` : <span className="text-dim">Nunca lo jugó</span>}
+            </dd>
+          </div>
+        </dl>
+
+        {/* Últimas partidas: línea jugada y resultado */}
         {p.recent && p.recent.length > 0 && (
-          <p className="flex items-center gap-1 text-muted" title="Últimas partidas, de la más nueva a la más vieja">
-            Últimas:
-            {p.recent.map((g, i) => (
-              <span
-                key={i}
-                className={`h-2 w-3 rounded-sm ${g.win ? "bg-win" : "bg-loss"}`}
-                title={`${g.win ? "Victoria" : "Derrota"} con ${champs[g.championId]?.name ?? "otro campeón"}, ${g.kills}/${g.deaths}/${g.assists}`}
-              />
-            ))}
-          </p>
+          <div className="flex items-center gap-1.5 border-t border-line/60 px-2.5 py-2">
+            <span className="text-[11px] text-dim">Últimas</span>
+            <ul className="flex gap-1">
+              {p.recent.map((g, i) => (
+                <li
+                  key={i}
+                  className={`flex h-5 w-5 items-center justify-center rounded ${g.win ? "bg-win/25 ring-1 ring-win/60" : "bg-loss/25 ring-1 ring-loss/60"}`}
+                  title={`${g.win ? "Victoria" : "Derrota"} con ${champs[g.championId]?.name ?? "otro campeón"}${g.role ? ` (${ROLE_LABEL[g.role]})` : ""}, ${g.kills}/${g.deaths}/${g.assists}`}
+                >
+                  {g.role ? (
+                    <RoleIcon role={g.role} size={11} />
+                  ) : (
+                    <span className={`h-1.5 w-1.5 rounded-full ${g.win ? "bg-win" : "bg-loss"}`} />
+                  )}
+                </li>
+              ))}
+            </ul>
+          </div>
         )}
-        {flags.length > 0 && (
-          <ul className="flex flex-wrap gap-1 pt-0.5">
-            {flags.map((f) => (
+
+        {(autofill || flags.length > 0) && (
+          <ul className="mt-auto flex flex-wrap gap-1 border-t border-line/60 px-2.5 py-2">
+            {autofill && main && (
+              <li className={`rounded-full border px-1.5 py-px text-[11px] ${FLAG_CLASS.bad}`}>
+                Posible autofill: suele ir {ROLE_LABEL[main.role].toLowerCase()}
+              </li>
+            )}
+            {flags.slice(0, autofill ? 2 : 3).map((f) => (
               <li key={f.text} className={`rounded-full border px-1.5 py-px text-[11px] ${FLAG_CLASS[f.tone]}`}>
                 {f.text}
               </li>

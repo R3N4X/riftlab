@@ -8,7 +8,7 @@
  * cerca del límite. Solo se pide una vez por partida.
  */
 import { cacheLife } from "next/cache";
-import type { Platform, Role, Tier } from "./constants";
+import { ROLES, type Platform, type Role, type Tier } from "./constants";
 import { sortByLane } from "./lanes";
 import {
   getActiveGame,
@@ -16,6 +16,7 @@ import {
   getLeagueEntries,
   getMatch,
   getMatchIds,
+  getTopMasteries,
   isRiotBusy,
   type ChampionMastery,
   type LeagueEntry,
@@ -25,6 +26,8 @@ import { getChampionRoleGames } from "./stats";
 
 export interface LiveRecentGame {
   win: boolean;
+  /** Línea que jugó en esa partida (null si no se sabe, por ejemplo en ARAM). */
+  role: Role | null;
   championId: number;
   kills: number;
   deaths: number;
@@ -57,6 +60,39 @@ export interface LivePlayerInfo {
   recent: LiveRecentGame[] | null;
   /** Línea estimada (solo en la Grieta); los equipos vienen ordenados de Superior a Soporte. */
   role: Role | null;
+  /**
+   * Línea que más juega: mezcla sus campeones con más maestría (según en qué línea se juega cada uno)
+   * y las líneas de sus últimas partidas. `share` es qué parte de su juego representa (0 a 1).
+   */
+  mainRole: { role: Role; share: number } | null;
+}
+
+type RoleGames = Record<string, Partial<Record<Role, number>>>;
+
+function mainRoleOf(top: ChampionMastery[] | null, recent: LiveRecentGame[] | null, roleGames: RoleGames | null): LivePlayerInfo["mainRole"] {
+  const score = Object.fromEntries(ROLES.map((r) => [r, 0])) as Record<Role, number>;
+  let weight = 0;
+  // Maestría: cada campeón reparte sus puntos según en qué línea se juega (pesa 60 %).
+  const totalPoints = top?.reduce((s, m) => s + m.championPoints, 0) ?? 0;
+  if (top && roleGames && totalPoints > 0) {
+    for (const m of top) {
+      const games = roleGames[String(m.championId)] ?? {};
+      const total = Object.values(games).reduce((s, g) => s + (g ?? 0), 0);
+      if (!total) continue;
+      for (const r of ROLES) score[r] += 0.6 * (m.championPoints / totalPoints) * ((games[r] ?? 0) / total);
+    }
+    weight += 0.6;
+  }
+  // Últimas partidas: lo que está jugando ahora (pesa 40 %).
+  const withRole = recent?.filter((g) => g.role) ?? [];
+  if (withRole.length) {
+    for (const g of withRole) score[g.role!] += 0.4 / withRole.length;
+    weight += 0.4;
+  }
+  if (!weight) return null;
+  const best = ROLES.reduce((a, b) => (score[b] > score[a] ? b : a));
+  const sum = ROLES.reduce((s, r) => s + score[r], 0) || 1;
+  return { role: best, share: score[best] / sum };
 }
 
 export interface LiveGameInfo {
@@ -78,6 +114,12 @@ async function cachedMastery(platform: Platform, puuid: string, championId: numb
   return getChampionMastery(platform, puuid, championId);
 }
 
+async function cachedTopMasteries(platform: Platform, puuid: string): Promise<ChampionMastery[]> {
+  "use cache";
+  cacheLife("hours");
+  return getTopMasteries(platform, puuid, 10);
+}
+
 async function cachedRecentIds(platform: Platform, puuid: string, queue?: number): Promise<string[]> {
   "use cache";
   cacheLife("minutes");
@@ -92,12 +134,16 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
   const queue = RANKED.has(game.gameQueueConfigId) ? game.gameQueueConfigId : undefined;
   const preferred = game.gameQueueConfigId === 440 ? "RANKED_FLEX_SR" : "RANKED_SOLO_5x5";
 
+  const classic = game.gameMode === "CLASSIC";
+  const roleGames = classic ? await getChampionRoleGames().catch(() => null) : null;
+
   const players = await Promise.all(
     game.participants.map(async (p): Promise<LivePlayerInfo> => {
       const [gameName = "", tagLine = ""] = (p.riotId ?? "").split("#");
-      const [entries, mastery] = await Promise.all([
+      const [entries, mastery, top] = await Promise.all([
         cachedLeague(platform, p.puuid).catch(() => null),
         cachedMastery(platform, p.puuid, p.championId).catch(() => null),
+        classic ? cachedTopMasteries(platform, p.puuid).catch(() => null) : null,
       ]);
       const entry =
         entries?.find((e) => e.queueType === preferred) ??
@@ -115,7 +161,8 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
           recent = matches.flatMap((m) => {
             const me = m.info.participants.find((x) => x.puuid === p.puuid);
             if (!me || m.info.gameDuration < 300) return [];
-            return [{ win: me.win, championId: me.championId, kills: me.kills, deaths: me.deaths, assists: me.assists }];
+            const role = ROLES.includes(me.teamPosition as Role) ? (me.teamPosition as Role) : null;
+            return [{ win: me.win, role, championId: me.championId, kills: me.kills, deaths: me.deaths, assists: me.assists }];
           });
         }
       }
@@ -145,13 +192,13 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
         mastery: mastery ? { level: mastery.championLevel, points: mastery.championPoints, lastPlayTime: mastery.lastPlayTime } : null,
         recent,
         role: null,
+        mainRole: classic ? mainRoleOf(top, recent, roleGames) : null,
       };
     }),
   );
 
   // En la Grieta cada equipo se ordena por línea: así cada jugador queda frente a su rival.
-  if (game.gameMode === "CLASSIC") {
-    const roleGames = await getChampionRoleGames().catch(() => null);
+  if (classic) {
     if (roleGames) {
       const sorted = [100, 200].flatMap((teamId) =>
         sortByLane(players.filter((p) => p.teamId === teamId), roleGames).map(({ player, role }) => ({ ...player, role })),

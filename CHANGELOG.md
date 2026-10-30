@@ -2,6 +2,12 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.15 (30-10-2026)
+
+- Pantalla de carga renovada: la imagen de cada campeón queda bien encuadrada y la tarjeta separa el rango, la línea y la maestría, las últimas partidas y los avisos.
+- Cada jugador muestra la línea que más juega ("Suele jugar") y el aviso "Posible autofill" cuando en esta partida va en otra. Las últimas partidas muestran en qué línea jugó cada una.
+- En tu partida, la línea de tus aliados es la real del cliente; la de los rivales es una estimación.
+
 ## 0.2.14 (29-10-2026)
 
 - En vivo recomienda picks para tu línea desde el primer momento de la selección, aunque nadie haya elegido todavía (por ejemplo, si eliges primero).

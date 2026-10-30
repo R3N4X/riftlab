@@ -12,7 +12,7 @@
 import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
-import { join } from "node:path";
+import { dirname, join } from "node:path";
 import { BrowserWindow, Menu, app, globalShortcut, ipcMain, screen, shell } from "electron";
 import { isPlatform } from "../src/lib/constants";
 import {
@@ -341,6 +341,16 @@ async function createWindow() {
       sandbox: true,
     },
   });
+
+  // Ícono y nombre del botón de la barra de tareas (y de la app anclada), sin depender de cómo se abrió.
+  if (process.platform === "win32")
+    win.setAppDetails({
+      appId: "RiftLab",
+      appIconPath: ICON,
+      appIconIndex: 0,
+      relaunchCommand: app.isPackaged ? `"${process.execPath}"` : `"${process.execPath}" "${ROOT}" --prod`,
+      relaunchDisplayName: "RiftLab",
+    });
 
   reserveTitleBar(win);
   if (!SMOKE) win.once("ready-to-show", () => win?.show());
@@ -724,8 +734,13 @@ function ensureStartMenuShortcut() {
   };
   try {
     const current = existsSync(link) ? shell.readShortcutLink(link) : null;
-    if (current?.appUserModelId === options.appUserModelId && current.icon === ICON && current.target === options.target) return;
-    shell.writeShortcutLink(link, current ? "replace" : "create", options);
+    if (current?.appUserModelId !== options.appUserModelId || current.icon !== ICON || current.target !== options.target)
+      shell.writeShortcutLink(link, current ? "replace" : "create", options);
+    // Electron crea "Electron.lnk" con el mismo id para los avisos de Windows, con el ícono del átomo,
+    // y la barra de tareas toma ese. Se le pone el ícono de RiftLab (si se borra, lo vuelve a crear).
+    const electronLink = join(dirname(link), "Electron.lnk");
+    const auto = existsSync(electronLink) ? shell.readShortcutLink(electronLink) : null;
+    if (auto?.appUserModelId === options.appUserModelId && auto.icon !== ICON) shell.writeShortcutLink(electronLink, "replace", options);
   } catch {
     // sin acceso directo solo cambia el ícono de la barra de tareas
   }

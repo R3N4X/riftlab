@@ -1,6 +1,6 @@
 {
   "name": "riftlab",
-  "version": "0.2.15",
+  "version": "0.2.16",
   "private": true,
   "main": "desktop/dist/main.cjs",
   "scripts": {
@@ -40,7 +40,7 @@
     "tsx": "^4.23.15",
     "typescript": "^5"
   },
-  "description": "RiftLab: estadÃ­sticas de League of Legends y TFT",
+  "description": "RiftLab: estadÃƒÂ­sticas de League of Legends y TFT",
   "author": "RiftLab",
   "build": {
     "appId": "com.riftlab.app",

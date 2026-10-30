@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.16 (30-10-2026)
+
+- Worlds se actualiza solo: los equipos y resultados de cada serie se toman de Leaguepedia y la página se refresca cada dos minutos mientras está abierta. Si la wiki no responde, se muestran los últimos resultados guardados.
+
 ## 0.2.15 (30-10-2026)
 
 - Pantalla de carga renovada: la imagen de cada campeón queda bien encuadrada y la tarjeta separa el rango, la línea y la maestría, las últimas partidas y los avisos.

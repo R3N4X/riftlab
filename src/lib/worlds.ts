@@ -1,8 +1,9 @@
 /*
  * Calendario de Worlds 2026, temporal: el botón de la barra lateral desaparece solo después de la
- * final. Los datos se cargan a mano (lolesports.com y Wikipedia) porque la API de Riot no trae
- * esports; los resultados nuevos se agregan aquí. Las horas van en UTC y la página las muestra en la
- * hora del equipo de cada uno.
+ * final. La API de Riot no trae esports: este calendario se cargó a mano (lolesports.com y
+ * Wikipedia) y los equipos y marcadores se completan solos desde Leaguepedia (worlds-live.ts).
+ * Lo de aquí queda como respaldo si la wiki no responde. Las horas van en UTC y la página las
+ * muestra en la hora del equipo de cada uno.
  */
 
 export type Region = "LCK" | "LPL" | "LEC" | "LCS" | "LCP" | "CBLOL";
@@ -65,7 +66,7 @@ export interface WorldsMatch {
 /** Día después de la final: desde ahí el botón de la barra lateral ya no aparece. */
 export const WORLDS_END = Date.parse("2026-11-15T12:00:00Z");
 
-export const SCHEDULE_UPDATED = "27 de octubre";
+export const SCHEDULE_UPDATED = "30 de octubre";
 
 const m = (
   stage: StageId,
@@ -114,10 +115,10 @@ export const MATCHES: WorldsMatch[] = [
   m("swiss", "Ronda 3", "2026-10-26T19:00:00Z", 3, "LOS", "TSW", [2, 0]),
   m("swiss", "Ronda 3", "2026-10-26T22:00:00Z", 3, "AL", "TL", [0, 2]),
 
-  m("swiss", "Ronda 4", "2026-10-28T20:00:00Z", 3, "MKOI", "T1"),
-  m("swiss", "Ronda 4", "2026-10-28T23:00:00Z", 3, "IG", "LYON"),
-  m("swiss", "Ronda 4", "2026-10-29T20:00:00Z", 3, "KC", "CFO"),
-  m("swiss", "Ronda 4", "2026-10-29T23:00:00Z", 3, "TES", "BLG"),
+  m("swiss", "Ronda 4", "2026-10-28T20:00:00Z", 3, "MKOI", "T1", [0, 2]),
+  m("swiss", "Ronda 4", "2026-10-28T23:00:00Z", 3, "IG", "LYON", [2, 1]),
+  m("swiss", "Ronda 4", "2026-10-29T20:00:00Z", 3, "KC", "CFO", [2, 0]),
+  m("swiss", "Ronda 4", "2026-10-29T23:00:00Z", 3, "TES", "BLG", [2, 1]),
   m("swiss", "Ronda 4", "2026-10-30T20:00:00Z", 3, "TL", "LOS"),
   m("swiss", "Ronda 4", "2026-10-30T23:00:00Z", 3, "HLE", "G2"),
 
@@ -142,9 +143,9 @@ export interface SwissRecord {
 }
 
 /** Récord de cada equipo en la fase suiza: 3 victorias clasifica, 3 derrotas elimina. */
-export function swissStandings(): SwissRecord[] {
+export function swissStandings(matches: WorldsMatch[] = MATCHES): SwissRecord[] {
   const table = new Map<TeamCode, SwissRecord>();
-  for (const match of MATCHES) {
+  for (const match of matches) {
     if (match.stage !== "swiss") continue;
     const [a, b] = match.teams;
     for (const team of [a, b]) if (team && !table.has(team)) table.set(team, { team, wins: 0, losses: 0 });
@@ -160,10 +161,10 @@ export function swissStandings(): SwissRecord[] {
 }
 
 /** Récord con el que cada equipo llega a cada serie de la fase suiza ("1-0", "2-2"...). */
-export function swissPools(): Map<WorldsMatch, string> {
+export function swissPools(matches: WorldsMatch[] = MATCHES): Map<WorldsMatch, string> {
   const record = new Map<TeamCode, [number, number]>();
   const pools = new Map<WorldsMatch, string>();
-  const swiss = MATCHES.filter((m) => m.stage === "swiss").sort((x, y) => Date.parse(x.start) - Date.parse(y.start));
+  const swiss = matches.filter((m) => m.stage === "swiss").sort((x, y) => Date.parse(x.start) - Date.parse(y.start));
   for (const match of swiss) {
     const [a, b] = match.teams;
     if (!a || !b) {

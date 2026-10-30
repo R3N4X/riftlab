@@ -1,8 +1,10 @@
 "use client";
 
-import { useState, useSyncExternalStore } from "react";
+import { useRouter } from "next/navigation";
+import { createContext, useContext, useEffect, useState, useSyncExternalStore } from "react";
 import {
   MATCHES,
+  SCHEDULE_UPDATED,
   STAGES,
   TEAMS,
   swissPools,
@@ -45,28 +47,52 @@ function isLive(match: WorldsMatch, now: number) {
 
 type StageState = "hecha" | "ahora" | "proxima";
 
-function stageState(id: StageId, now: number): StageState {
+function stageState(id: StageId, now: number, all: WorldsMatch[]): StageState {
   const stage = STAGES.find((s) => s.id === id)!;
-  const matches = MATCHES.filter((m) => m.stage === id);
+  const matches = all.filter((m) => m.stage === id);
   if (matches.every((m) => m.score)) return "hecha";
   const first = Math.min(...matches.map((m) => Date.parse(m.start)));
   return now >= first || dayKey.format(now) >= stage.start ? "ahora" : "proxima";
 }
 
-export function WorldsSchedule() {
+/** Series del torneo con los resultados de Leaguepedia ya puestos (o el calendario guardado). */
+const MatchesContext = createContext<WorldsMatch[]>(MATCHES);
+const useMatches = () => useContext(MatchesContext);
+
+/** Cada cuánto se vuelve a pedir la página al servidor, que a su vez guarda la wiki un minuto. */
+const REFRESH_MS = 2 * 60_000;
+
+export function WorldsSchedule({ matches, updated }: { matches: WorldsMatch[]; updated: string | null }) {
+  const router = useRouter();
+  useEffect(() => {
+    const t = setInterval(() => {
+      if (document.visibilityState === "visible") router.refresh();
+    }, REFRESH_MS);
+    return () => clearInterval(t);
+  }, [router]);
+
+  return (
+    <MatchesContext.Provider value={matches}>
+      <Schedule updated={updated} />
+    </MatchesContext.Provider>
+  );
+}
+
+function Schedule({ updated }: { updated: string | null }) {
   const now = useNow();
+  const matches = useMatches();
   if (now === null) return <div className="h-96 animate-pulse rounded-lg bg-surface" aria-hidden="true" />;
 
   const zone = Intl.DateTimeFormat().resolvedOptions().timeZone;
   const today = dayKey.format(now);
   const days = new Map<string, WorldsMatch[]>();
-  for (const match of MATCHES) {
+  for (const match of matches) {
     const key = dayKey.format(Date.parse(match.start));
     days.set(key, [...(days.get(key) ?? []), match]);
   }
   const upcoming = [...days].filter(([key, list]) => key >= today || list.some((m) => !m.score));
   const played = [...days].filter(([key, list]) => key < today && list.every((m) => m.score)).reverse();
-  const next = MATCHES.find((m) => !m.score && (isLive(m, now) || Date.parse(m.start) > now));
+  const next = matches.find((m) => !m.score && (isLive(m, now) || Date.parse(m.start) > now));
 
   return (
     <div className="space-y-10">
@@ -114,8 +140,38 @@ export function WorldsSchedule() {
           </div>
         </details>
       )}
+
+      <p className="text-sm text-dim">
+        {updated ? (
+          <>
+            Resultados de{" "}
+            <a
+              href="https://lol.fandom.com/wiki/2026_Season_World_Championship/Main_Event"
+              target="_blank"
+              rel="noreferrer"
+              className="text-muted underline hover:text-ink"
+            >
+              Leaguepedia
+            </a>{" "}
+            (CC BY-SA), se actualizan solos. Última edición: {lastEdit(updated, now)}.
+          </>
+        ) : (
+          <>No se pudo conectar con Leaguepedia: se muestran los resultados guardados al {SCHEDULE_UPDATED}.</>
+        )}{" "}
+        Para el marcador en vivo y las transmisiones, entra a{" "}
+        <a href="https://lolesports.com/" target="_blank" rel="noreferrer" className="text-muted underline hover:text-ink">
+          lolesports.com
+        </a>
+        .
+      </p>
     </div>
   );
+}
+
+function lastEdit(iso: string, now: number) {
+  const minutes = Math.max(0, Math.round((now - Date.parse(iso)) / 60_000));
+  if (minutes < 60) return minutes <= 1 ? "hace un minuto" : `hace ${minutes} minutos`;
+  return `${dayLabel.format(Date.parse(iso))}, ${timeLabel.format(Date.parse(iso))}`;
 }
 
 function Logo({ code, size = 20, faded = false }: { code: TeamCode | null; size?: number; faded?: boolean }) {
@@ -191,8 +247,9 @@ const VIEWS: { id: View; label: string; stages: StageId[] }[] = [
 ];
 
 function Brackets({ now }: { now: number }) {
+  const matches = useMatches();
   // Abre en la etapa que se está jugando (o la próxima, si hoy es día libre).
-  const current = VIEWS.find((v) => v.stages.some((s) => stageState(s, now) !== "hecha"))?.id ?? "eliminatorias";
+  const current = VIEWS.find((v) => v.stages.some((s) => stageState(s, now, matches) !== "hecha"))?.id ?? "eliminatorias";
   const [picked, setPicked] = useState<View | null>(null);
   const view = picked ?? current;
 
@@ -202,7 +259,7 @@ function Brackets({ now }: { now: number }) {
         <h2 className="font-display text-2xl font-semibold">Cómo va el torneo</h2>
         <div role="tablist" aria-label="Etapa" className="flex rounded-md border border-line bg-surface p-0.5">
           {VIEWS.map((v) => {
-            const state = v.stages.map((s) => stageState(s, now));
+            const state = v.stages.map((s) => stageState(s, now, matches));
             const done = state.every((s) => s === "hecha");
             const active = state.includes("ahora");
             return (
@@ -272,7 +329,7 @@ function MatchBox({ match, now }: { match: WorldsMatch; now: number }) {
 /** Equipos que ya terminaron la fase suiza con un récord dado (3-0, 0-3...). */
 function OutcomeBox({ wins, losses, slots }: { wins: number; losses: number; slots: number }) {
   const advanced = wins === 3;
-  const teams = swissStandings().filter((r) => r.wins === wins && r.losses === losses);
+  const teams = swissStandings(useMatches()).filter((r) => r.wins === wins && r.losses === losses);
   return (
     <div className={`rounded-md border p-2 ${advanced ? "border-win/50 bg-win/10" : "border-loss/40 bg-loss/10"}`}>
       <p className={`mb-1.5 flex items-baseline justify-between text-xs font-semibold ${advanced ? "text-win" : "text-loss"}`}>
@@ -315,8 +372,9 @@ function Column({ title, children }: { title: string; children: React.ReactNode 
 }
 
 function SwissBracket({ now }: { now: number }) {
-  const pools = swissPools();
-  const inPool = (round: string, pool: string) => MATCHES.filter((m) => m.stage === "swiss" && m.round === round && pools.get(m) === pool);
+  const matches = useMatches();
+  const pools = swissPools(matches);
+  const inPool = (round: string, pool: string) => matches.filter((m) => m.stage === "swiss" && m.round === round && pools.get(m) === pool);
   const rounds: { title: string; round: string; pools: string[] }[] = [
     { title: "Ronda 1", round: "Ronda 1", pools: ["0-0"] },
     { title: "Ronda 2", round: "Ronda 2", pools: ["1-0", "0-1"] },
@@ -372,7 +430,8 @@ function BracketPair({ children }: { children: [React.ReactNode, React.ReactNode
 }
 
 function KnockoutBracket({ now }: { now: number }) {
-  const of = (stage: StageId) => MATCHES.filter((m) => m.stage === stage);
+  const matches = useMatches();
+  const of = (stage: StageId) => matches.filter((m) => m.stage === stage);
   const [q1, q2, q3, q4] = of("cuartos");
   const [s1, s2] = of("semis");
   const [final] = of("final");
@@ -412,7 +471,8 @@ function KnockoutBracket({ now }: { now: number }) {
 }
 
 function PlayInBracket({ now }: { now: number }) {
-  const of = (round: string) => MATCHES.filter((m) => m.stage === "playin" && m.round === round);
+  const matches = useMatches();
+  const of = (round: string) => matches.filter((m) => m.stage === "playin" && m.round === round);
   const qualifier = of("Clasificación")[0];
   const winner = qualifier?.score ? qualifier.teams[qualifier.score[0] > qualifier.score[1] ? 0 : 1] : null;
   const columns: { title: string; pools: { label: string; matches: WorldsMatch[] }[] }[] = [

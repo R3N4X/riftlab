@@ -1,6 +1,7 @@
 import type { Metadata } from "next";
+import { Suspense } from "react";
 import { WorldsSchedule } from "@/components/worlds";
-import { SCHEDULE_UPDATED } from "@/lib/worlds";
+import { getWorldsResults } from "@/lib/worlds-live";
 
 export const metadata: Metadata = { title: "Worlds 2026" };
 
@@ -15,16 +16,15 @@ export default function WorldsPage() {
         </p>
       </header>
       <div className="px-4 py-8 sm:px-8">
-        <WorldsSchedule />
-        <p className="mt-10 text-sm text-dim">
-          Resultados cargados a mano, actualizados al {SCHEDULE_UPDATED}. Para el marcador en vivo y las transmisiones, entra
-          a{" "}
-          <a href="https://lolesports.com/" target="_blank" rel="noreferrer" className="text-muted underline hover:text-ink">
-            lolesports.com
-          </a>
-          .
-        </p>
+        <Suspense fallback={<div className="h-96 animate-pulse rounded-lg bg-surface" aria-hidden="true" />}>
+          <Results />
+        </Suspense>
       </div>
     </>
   );
+}
+
+async function Results() {
+  const { matches, updated } = await getWorldsResults();
+  return <WorldsSchedule matches={matches} updated={updated} />;
 }

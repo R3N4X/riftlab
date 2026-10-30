@@ -704,7 +704,35 @@ ipcMain.handle("update:install", () => {
 
 /* ---------- Ciclo de vida ---------- */
 
+/**
+ * Desde el proyecto la app corre como electron.exe, con el ícono de Electron. Abierta desde el acceso
+ * directo del escritorio la barra de tareas toma el de RiftLab, pero al iniciar con Windows no hay
+ * acceso directo de por medio. Un acceso en el menú Inicio con el mismo AppUserModelId hace que
+ * Windows use siempre el ícono de RiftLab. La app instalada no lo necesita: RiftLab.exe ya lo trae.
+ */
+function ensureStartMenuShortcut() {
+  if (app.isPackaged || process.platform !== "win32" || SMOKE) return;
+  const link = join(app.getPath("appData"), "Microsoft", "Windows", "Start Menu", "Programs", "RiftLab.lnk");
+  const options = {
+    target: process.execPath,
+    args: `"${ROOT}" --prod`,
+    cwd: ROOT,
+    icon: ICON,
+    iconIndex: 0,
+    appUserModelId: "RiftLab",
+    description: "RiftLab",
+  };
+  try {
+    const current = existsSync(link) ? shell.readShortcutLink(link) : null;
+    if (current?.appUserModelId === options.appUserModelId && current.icon === ICON && current.target === options.target) return;
+    shell.writeShortcutLink(link, current ? "replace" : "create", options);
+  } catch {
+    // sin acceso directo solo cambia el ícono de la barra de tareas
+  }
+}
+
 app.whenReady().then(async () => {
+  ensureStartMenuShortcut();
   league.flashKey = currentSettings().flashKey;
   league.start();
   if (!SMOKE) globalShortcut.register(OVERLAY_SHORTCUT, () => void toggleOverlay());

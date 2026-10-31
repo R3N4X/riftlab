@@ -2,6 +2,11 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.17 (31-10-2026)
+
+- Los picks recomendados en la selección son solo de campeones que de verdad se juegan en tu línea (ya no aparecen Katarina o Karthus de tirador).
+- La recomendación da más peso a tu rival de línea y el winrate esperado es más realista: antes, sumar muchos cruces con pocas partidas lo inflaba hasta 60 % o más.
+
 ## 0.2.16 (30-10-2026)
 
 - Worlds se actualiza solo: los equipos y resultados de cada serie se toman de Leaguepedia y la página se refresca cada dos minutos mientras está abierta. Si la wiki no responde, se muestran los últimos resultados guardados.

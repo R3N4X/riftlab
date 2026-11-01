@@ -748,7 +748,7 @@ function ensureStartMenuShortcut() {
     try {
       const auto = existsSync(electronLink) ? shell.readShortcutLink(electronLink) : null;
       if (auto?.appUserModelId === options.appUserModelId && auto.icon !== ICON)
-        shell.writeShortcutLink(electronLink, "update", { icon: ICON, iconIndex: 0 });
+        shell.writeShortcutLink(electronLink, "update", { ...auto, icon: ICON, iconIndex: 0 });
     } catch {
       // se reintenta en el próximo cambio de la carpeta
     }

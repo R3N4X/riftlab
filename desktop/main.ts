@@ -10,7 +10,7 @@
  * la ventana por IPC.
  */
 import { spawn, type ChildProcess } from "node:child_process";
-import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, writeFileSync } from "node:fs";
+import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, watch, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
 import { BrowserWindow, Menu, app, globalShortcut, ipcMain, screen, shell } from "electron";
@@ -736,13 +736,34 @@ function ensureStartMenuShortcut() {
     const current = existsSync(link) ? shell.readShortcutLink(link) : null;
     if (current?.appUserModelId !== options.appUserModelId || current.icon !== ICON || current.target !== options.target)
       shell.writeShortcutLink(link, current ? "replace" : "create", options);
-    // Electron crea "Electron.lnk" con el mismo id para los avisos de Windows, con el ícono del átomo,
-    // y la barra de tareas toma ese. Se le pone el ícono de RiftLab (si se borra, lo vuelve a crear).
-    const electronLink = join(dirname(link), "Electron.lnk");
-    const auto = existsSync(electronLink) ? shell.readShortcutLink(electronLink) : null;
-    if (auto?.appUserModelId === options.appUserModelId && auto.icon !== ICON) shell.writeShortcutLink(electronLink, "replace", options);
   } catch {
     // sin acceso directo solo cambia el ícono de la barra de tareas
+  }
+  // Electron crea "Electron.lnk" con el mismo id cada vez que muestra un aviso de Windows, con el
+  // ícono del átomo, y la barra de tareas toma ese. Se le cambia solo el ícono: si también se le
+  // cambian el destino o los argumentos, Electron lo vuelve a escribir en el aviso siguiente. Como
+  // los avisos llegan con la app abierta, se vigila la carpeta y se corrige cada vez que aparece.
+  const electronLink = join(dirname(link), "Electron.lnk");
+  const fixElectronLink = () => {
+    try {
+      const auto = existsSync(electronLink) ? shell.readShortcutLink(electronLink) : null;
+      if (auto?.appUserModelId === options.appUserModelId && auto.icon !== ICON)
+        shell.writeShortcutLink(electronLink, "update", { icon: ICON, iconIndex: 0 });
+    } catch {
+      // se reintenta en el próximo cambio de la carpeta
+    }
+  };
+  fixElectronLink();
+  try {
+    let pending: NodeJS.Timeout | undefined;
+    watch(dirname(link), (_event, name) => {
+      if (name !== "Electron.lnk") return;
+      // Se espera a que Electron termine de escribirlo (y se ignora el cambio propio, que ya tiene el ícono).
+      clearTimeout(pending);
+      pending = setTimeout(fixElectronLink, 1000);
+    });
+  } catch {
+    // sin vigilancia queda la corrección al abrir la app
   }
 }
 

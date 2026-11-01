@@ -8,6 +8,7 @@ Cada versión publicada, de la más nueva a la más vieja. El texto de cada vers
 - Antes de elegir se muestra el mejor pick para tu línea, y las recomendaciones aparecen en una grilla de 15 campeones con su puntaje. Al tocar uno ves cómo cambian los números frente a tu campeón actual.
 - La puntuación global usa el mismo cálculo que las recomendaciones, así que el mismo campeón tiene el mismo puntaje en los dos lugares.
 - Pestañas "Recomendaciones" y "Emparejamiento" (consejos y qué comprar contra tu rival de línea).
+- El ícono de RiftLab en la barra de tareas ya no vuelve al de Electron después de un aviso de Windows.
 
 ## 0.2.17 (31-10-2026)
 

@@ -162,7 +162,10 @@ export function LiveSync() {
   const draft = state?.champSelect ?? state?.game ?? null;
   // Con el cliente conectado y sin selección ni partida (menú, sala, fin de partida) la vista vuelve a quedar vacía;
   // solo se conserva la última si se pierde la conexión.
-  const target = draft ? draftToQuery(draft, Boolean(state?.game && !state.champSelect)) : state?.connected ? "" : null;
+  const query = draft ? draftToQuery(draft, Boolean(state?.game && !state.champSelect)) : state?.connected ? "" : null;
+  // La vista previa de una recomendación (?ver=) se conserva mientras dura la selección y no fijas campeón.
+  const preview = searchParams.get("ver");
+  const target = query && preview && state?.champSelect && !query.includes("fijo=1") ? `${query}&ver=${preview}` : query;
   const currentQuery = searchParams.toString();
 
   useEffect(() => {

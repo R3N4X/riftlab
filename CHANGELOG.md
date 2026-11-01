@@ -2,6 +2,13 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.18 (01-11-2026)
+
+- Selección de campeones renovada: cada campeón se evalúa con puntajes de 0 a 5 (2.5 es parejo, desde 3 es ventaja) en la puntuación global, la fase de líneas, la sinergia, el counter y la ventaja temprana.
+- Antes de elegir se muestra el mejor pick para tu línea, y las recomendaciones aparecen en una grilla de 15 campeones con su puntaje. Al tocar uno ves cómo cambian los números frente a tu campeón actual.
+- La puntuación global usa el mismo cálculo que las recomendaciones, así que el mismo campeón tiene el mismo puntaje en los dos lugares.
+- Pestañas "Recomendaciones" y "Emparejamiento" (consejos y qué comprar contra tu rival de línea).
+
 ## 0.2.17 (31-10-2026)
 
 - Los picks recomendados en la selección son solo de campeones que de verdad se juegan en tu línea (ya no aparecen Katarina o Karthus de tirador).

@@ -16,12 +16,22 @@ import {
   getSummonerSpells,
   type ChampionSummary,
 } from "@/lib/ddragon";
-import { compact, pct, wrClass } from "@/lib/format";
+import { SCORE_HINT, formatScore, goldScore, scoreClass, scoreOf } from "@/lib/draft-score";
+import { compact, pct } from "@/lib/format";
 import { parseRank, parseString } from "@/lib/params";
-import { getChampionStats, getDraftInsights, getDraftPicks, type DraftInsights, type DraftSlot, type EncounterCell } from "@/lib/stats";
+import {
+  getChampionStats,
+  getDraftInsights,
+  getDraftPicks,
+  type DraftInsights,
+  type DraftPick,
+  type DraftSlot,
+  type EncounterCell,
+} from "@/lib/stats";
 import { counterReason } from "@/lib/stats/reasons";
 import { BuildPacks, ItemsAndSkills } from "./build-panels";
 import { GameView } from "./game-view";
+import { PanelTabs } from "./panel-tabs";
 
 export const metadata: Metadata = { title: "En vivo" };
 
@@ -56,6 +66,9 @@ const parseKeys = (value: string | undefined) =>
     .filter((k) => /^\d+$/.test(k))
     .slice(0, 5);
 
+/** Cuántas recomendaciones muestra la grilla (tres filas de cinco). */
+const PICK_COUNT = 15;
+
 async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo">["searchParams"] }) {
   const sp = await searchParams;
   const rank = parseRank(sp);
@@ -68,25 +81,37 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
   const allies = parseSlots(parseString(sp, "aliados"));
   const enemies = parseSlots(parseString(sp, "rivales"));
   const bans = { mine: parseKeys(parseString(sp, "bloqueos")), theirs: parseKeys(parseString(sp, "bloqueosRivales")) };
+  const unavailable = [...bans.mine, ...bans.theirs];
+  const verParam = parseString(sp, "ver");
 
-  const [version, champs, draft, spells] = await Promise.all([
+  const [version, champs, draft, spells, picks] = await Promise.all([
     getLatestVersion(),
     getChampionsByKey(),
     getDraftInsights({ key: myKey, role: myRole }, allies, enemies, rank),
     getSummonerSpells(),
+    // Con la línea conocida y sin fijar campeón se recomiendan picks (también al elegir primero).
+    myRole && !locked && !inGame ? getDraftPicks(myRole, allies, enemies, unavailable, rank, PICK_COUNT) : Promise.resolve([]),
   ]);
   const me = myKey ? champs[myKey] : undefined;
-  // Con solo la línea (por ejemplo, al elegir primero) ya se pueden recomendar picks.
+  // En vista previa: el que tocaste en la grilla o, sin campeón propio todavía, el mejor pick.
+  const chosen = verParam && /^\d+$/.test(verParam) && champs[verParam] && verParam !== myKey && !locked && !inGame ? verParam : null;
+  const previewKey = chosen ?? (!me ? (picks[0]?.key ?? null) : null);
+  const preview = previewKey ? champs[previewKey] : undefined;
   const empty = !myKey && !myRole && !allies.length && !enemies.length;
   // Lo justo para la pantalla de carga (componente de cliente).
   const slimChamps = Object.fromEntries(Object.entries(champs).map(([k, c]) => [k, { id: c.id, name: c.name }]));
   const slimSpells = Object.fromEntries(Object.entries(spells).map(([k, sp]) => [k, { file: sp.image.full, name: sp.name }]));
-  const preview = parseString(sp, "jugadores") ?? undefined;
+  const playersPreview = parseString(sp, "jugadores") ?? undefined;
+
+  // La URL actual sin la vista previa: base de los enlaces de la grilla.
+  const query = new URLSearchParams();
+  for (const [k, v] of Object.entries(sp)) if (k !== "ver" && typeof v === "string") query.set(k, v);
+  const baseQuery = query.toString();
 
   return (
     <>
       <TopBar me={me} myRole={myRole} draft={draft} bans={bans} champs={champs} version={version} />
-      {preview && <LoadingScreen champs={slimChamps} spells={slimSpells} version={version} preview={preview} />}
+      {playersPreview && <LoadingScreen champs={slimChamps} spells={slimSpells} version={version} preview={playersPreview} />}
 
       {empty ? (
         <div className="rounded-lg border border-line bg-surface py-16 text-center">
@@ -96,51 +121,33 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
             sola a medida que eligen.
           </p>
         </div>
-      ) : !me ? (
-        <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_minmax(0,1fr)]">
-          {myRole ? (
-            <Suspense fallback={<Skeleton rows={6} />}>
-              <DraftPicks
-                role={myRole}
-                allies={allies}
-                enemies={enemies}
-                unavailable={[...bans.mine, ...bans.theirs]}
-                rank={rank}
-                champs={champs}
-                version={version}
-                limit={8}
-              />
-            </Suspense>
-          ) : (
-            <div className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">
-              Todavía no eliges campeón. En esta cola el cliente no dice tu línea, así que no se pueden recomendar picks: pasa el cursor
-              sobre un campeón para ver su análisis.
-            </div>
-          )}
-          <div className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">
-            Todavía no eliges campeón{myRole ? ` (te toca ${ROLE_LABEL[myRole].toLowerCase()})` : ""}. Las recomendaciones se actualizan a
-            medida que cada jugador elige o bloquea. Pasa el cursor sobre un campeón en el cliente para ver su build y cómo le va en este
-            draft.
-          </div>
-        </div>
-      ) : inGame ? (
+      ) : me && inGame ? (
         <div className="space-y-4">
           <LoadingScreen champs={slimChamps} spells={slimSpells} version={version} />
           <Suspense fallback={<Skeleton rows={10} />}>
             <GameView me={me} myRole={myRole} rank={rank} draft={draft} champs={champs} version={version} />
           </Suspense>
         </div>
+      ) : !me && !preview ? (
+        <div className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">
+          Todavía no eliges campeón. En esta cola el cliente no dice tu línea, así que no se pueden recomendar picks: pasa el cursor sobre
+          un campeón para ver su análisis.
+        </div>
       ) : (
         <Suspense fallback={<Skeleton rows={10} />}>
           <Dashboard
             me={me}
+            preview={preview}
+            pickedPreview={Boolean(chosen)}
             myRole={myRole}
             rank={rank}
             locked={locked}
             draft={draft}
+            picks={picks}
             champs={champs}
             version={version}
-            slots={{ allies, enemies, unavailable: [...bans.mine, ...bans.theirs] }}
+            slots={{ allies, enemies }}
+            baseQuery={baseQuery}
           />
         </Suspense>
       )}
@@ -256,66 +263,100 @@ function BanRow({ keys, champs, version }: { keys: string[]; champs: Champs; ver
 
 async function Dashboard({
   me,
+  preview,
+  pickedPreview,
   myRole,
   rank,
   locked,
   draft,
+  picks,
   champs,
   version,
   slots,
+  baseQuery,
 }: {
-  me: ChampionSummary;
+  /** Tu campeón (elegido o con el cursor encima), si ya hay uno. */
+  me: ChampionSummary | undefined;
+  /** Campeón en vista previa: se evalúa en lugar del tuyo y se compara con él. */
+  preview: ChampionSummary | undefined;
+  /** La vista previa la elegiste tú en la grilla (si no, es el mejor pick automático). */
+  pickedPreview: boolean;
   myRole: Role | null;
   rank: RankFilter;
   locked: boolean;
   draft: DraftInsights;
+  picks: DraftPick[];
   champs: Champs;
   version: string;
-  slots: { allies: DraftSlot[]; enemies: DraftSlot[]; unavailable: string[] };
+  slots: { allies: DraftSlot[]; enemies: DraftSlot[] };
+  baseQuery: string;
 }) {
-  const stats = await getChampionStats(me.key, rank, myRole ?? undefined);
+  const shown = (preview ?? me)!;
+  const [stats, shownDraft] = await Promise.all([
+    getChampionStats(shown.key, rank, myRole ?? undefined),
+    preview ? getDraftInsights({ key: preview.key, role: myRole }, slots.allies, slots.enemies, rank) : Promise.resolve(draft),
+  ]);
   if (!stats) {
     return (
       <div className="rounded-lg border border-line bg-surface p-4 text-sm text-muted">
-        Todavía no hay datos de {me.name} en este parche.
+        Todavía no hay datos de {shown.name} en este parche.
       </div>
     );
   }
 
-  const [detail, items, spells, runeIndex] = await Promise.all([getChampion(me.id), getItems(), getSummonerSpells(), getRuneIndex()]);
+  const [detail, items, spells, runeIndex] = await Promise.all([getChampion(shown.id), getItems(), getSummonerSpells(), getRuneIndex()]);
+  const after = cardNumbers(shown, shownDraft, stats.role, champs);
+  // Comparación "tu campeón → vista previa": sin campeón propio, el lado izquierdo queda vacío.
+  const before = preview ? (me ? cardNumbers(me, draft, stats.role, champs) : null) : undefined;
+  const opp = shownDraft.laneOpponent;
+
+  const tabs = [
+    ...(!locked && picks.length
+      ? [
+          {
+            label: "Recomendaciones",
+            panel: <Recommendations picks={picks} me={me} shown={shown} champs={champs} version={version} baseQuery={baseQuery} />,
+          },
+        ]
+      : []),
+    {
+      label: "Emparejamiento",
+      panel: (
+        <div className="space-y-3">
+          {!opp && (
+            <p className="text-sm text-muted">Cuando tu rival de línea elija, aquí aparecen consejos para jugarle y qué comprar contra él.</p>
+          )}
+          <EnemyIntel draft={shownDraft} champs={champs} version={version} />
+          {opp && <MatchupBuildDetail compact champ={shown} role={stats.role} opponent={opp.key} champs={champs} version={version} />}
+        </div>
+      ),
+    },
+  ];
 
   return (
-    <div className="grid gap-4 xl:grid-cols-[320px_minmax(0,1fr)_minmax(0,1fr)]">
-      {/* Repartido para que toda la selección entre en pantalla sin scroll: las builds van en pestañas y,
-          debajo, objetos y habilidades. */}
-      <div className="space-y-4">
-        <ChampionCard me={me} stats={stats} draft={draft} locked={locked} champs={champs} version={version} rank={rank} />
-        {!locked ? (
-          <Suspense fallback={<Skeleton rows={4} />}>
-            <DraftPicks role={stats.role} {...slots} rank={rank} champs={champs} version={version} limit={4} current={me.key} />
-          </Suspense>
-        ) : (
-          <Suspense fallback={<Skeleton rows={4} />}>
-            <EnemyIntel draft={draft} champs={champs} version={version} />
-            {draft.laneOpponent && (
-              <MatchupBuildDetail
-                compact
-                champ={me}
-                role={stats.role}
-                opponent={draft.laneOpponent.key}
-                champs={champs}
-                version={version}
-              />
-            )}
-          </Suspense>
-        )}
+    <div className="grid gap-4 xl:grid-cols-[340px_minmax(0,1fr)_minmax(0,1fr)]">
+      <div className="space-y-3">
+        <ChampionHeader
+          me={me}
+          shown={shown}
+          preview={Boolean(preview)}
+          pickedPreview={pickedPreview}
+          tier={stats.summary?.tier}
+          role={stats.role}
+          locked={locked}
+          version={version}
+          rank={rank}
+          baseQuery={baseQuery}
+        />
+        <ScoreCard before={before} after={after} me={me} shown={shown} />
+        <PanelTabs tabs={tabs} />
       </div>
-      <Encounters me={me} draft={draft} champs={champs} version={version} />
+      <Encounters me={shown} draft={shownDraft} champs={champs} version={version} />
       <div className="space-y-4">
         <BuildPacks
-          me={me}
+          me={shown}
           stats={stats}
-          enemies={draft.enemies.map((e) => champs[e.key]).filter(Boolean)}
+          enemies={shownDraft.enemies.map((e) => champs[e.key]).filter(Boolean)}
           detail={detail}
           items={items}
           runeIndex={runeIndex}
@@ -328,127 +369,226 @@ async function Dashboard({
   );
 }
 
-type Stats = NonNullable<Awaited<ReturnType<typeof getChampionStats>>>;
+interface CardNumbers {
+  /** Puntuación global: winrate esperado en este draft. */
+  global: number | null;
+  /** Fase de líneas: winrate contra el rival de línea (o el promedio, si no eligió). */
+  lane: number | null;
+  laneBlind: boolean;
+  winRate: number;
+  synergy: number | null;
+  counter: number | null;
+  /** Parte del daño del equipo propio que es física. */
+  physical: number;
+  /** Oro al 15 contra el rival de línea. */
+  gold15: number | null;
+  reason: string | null;
+  opponent: ChampionSummary | undefined;
+}
 
-function ChampionCard({
-  me,
-  stats,
-  draft,
-  locked,
-  champs,
-  version,
-  rank,
-}: {
-  me: ChampionSummary;
-  stats: Stats;
-  draft: DraftInsights;
-  locked: boolean;
-  champs: Champs;
-  version: string;
-  rank: RankFilter;
-}) {
-  const opp = draft.laneOpponent;
-  const oppChamp = opp ? champs[opp.key] : undefined;
-  const laneCell = draft.encounters.find((e) => e.role === stats.role)?.enemy;
-  const reason = opp && oppChamp ? counterReason(me, oppChamp, opp.lane, opp.winRate < 0.5) : null;
-
-  const allyCells = draft.encounters.map((e) => e.ally).filter((c): c is EncounterCell => c !== null);
-  const enemyCells = draft.encounters.map((e) => e.enemy);
-
+function cardNumbers(champ: ChampionSummary, d: DraftInsights, role: Role, champs: Champs): CardNumbers {
+  const laneCell = d.encounters.find((e) => e.role === role)?.enemy;
+  const average = (cells: (EncounterCell | null)[]) => {
+    const withData = cells.filter((c): c is EncounterCell => c !== null && c.games > 0);
+    return withData.length ? withData.reduce((s, c) => s + c.winRate, 0) / withData.length : null;
+  };
   // Tipo de daño del equipo propio, según el perfil de cada campeón en Data Dragon.
-  const team = [me, ...draft.allies.map((a) => champs[a.key]).filter(Boolean)];
+  const team = [champ, ...d.allies.map((a) => champs[a.key]).filter(Boolean)];
   const attack = team.reduce((s, c) => s + c.info.attack, 0);
   const magic = team.reduce((s, c) => s + c.info.magic, 0);
-  const physicalShare = attack + magic ? attack / (attack + magic) : 0.5;
+  const opp = d.laneOpponent;
+  const opponent = opp ? champs[opp.key] : undefined;
+  return {
+    global: d.estimatedWinRate,
+    lane: laneCell && laneCell.games > 0 ? laneCell.winRate : null,
+    laneBlind: Boolean(laneCell?.blind),
+    winRate: d.baseWinRate,
+    synergy: average(d.encounters.map((e) => e.ally)),
+    counter: average(d.encounters.map((e) => e.enemy)),
+    physical: attack + magic ? attack / (attack + magic) : 0.5,
+    gold15: opp?.lane?.gold15 ?? null,
+    reason: opp && opponent ? counterReason(champ, opponent, opp.lane, opp.winRate < 0.5) : null,
+    opponent,
+  };
+}
 
+function ChampionHeader({
+  me,
+  shown,
+  preview,
+  pickedPreview,
+  tier,
+  role,
+  locked,
+  version,
+  rank,
+  baseQuery,
+}: {
+  me: ChampionSummary | undefined;
+  shown: ChampionSummary;
+  preview: boolean;
+  pickedPreview: boolean;
+  tier: Parameters<typeof TierBadge>[0]["tier"] | undefined;
+  role: Role;
+  locked: boolean;
+  version: string;
+  rank: RankFilter;
+  baseQuery: string;
+}) {
+  return (
+    <div className="flex items-center gap-2 rounded-lg border border-line bg-surface p-3">
+      {preview && (
+        <>
+          {me ? (
+            <ChampIcon version={version} id={me.id} name={me.name} size={36} />
+          ) : (
+            <span className="flex h-9 w-9 items-center justify-center rounded-md bg-night text-dim" title="Sin campeón todavía">
+              —
+            </span>
+          )}
+          <span className="text-muted" aria-hidden="true">
+            →
+          </span>
+        </>
+      )}
+      <ChampIcon version={version} id={shown.id} name={shown.name} size={preview ? 36 : 48} />
+      <div className="min-w-0 flex-1">
+        <p className="flex items-center gap-2 font-display text-xl font-semibold">
+          <Link href={`/campeones/${shown.id}?role=${role}&rank=${rank}`} className="truncate hover:text-gold-soft">
+            {shown.name}
+          </Link>
+          {tier && <TierBadge tier={tier} />}
+        </p>
+        <p className="flex items-center gap-1.5 text-xs text-muted">
+          <RoleIcon role={role} size={12} />
+          {ROLE_LABEL[role]}
+          {preview ? (pickedPreview ? " · vista previa" : " · mejor pick para este draft") : !locked ? " · sin bloquear" : ""}
+        </p>
+      </div>
+      {pickedPreview && (
+        <Link href={`/en-vivo?${baseQuery}`} scroll={false} className="shrink-0 text-xs text-muted underline hover:text-ink">
+          {me ? `Volver a ${me.name}` : "Quitar"}
+        </Link>
+      )}
+    </div>
+  );
+}
+
+/** Valor con comparación opcional, "antes → ahora". `before` undefined: sin comparación; null: no había campeón. */
+function Compare<T>({ before, after, render }: { before: T | null | undefined; after: T; render: (v: T) => React.ReactNode }) {
+  if (before === undefined) return <>{render(after)}</>;
+  return (
+    <span className="inline-flex items-baseline gap-1.5">
+      <span className="opacity-60">{before === null ? <span className="text-dim">—</span> : render(before)}</span>
+      <span className="text-sm text-dim" aria-hidden="true">
+        →
+      </span>
+      {render(after)}
+    </span>
+  );
+}
+
+function Score({ wr }: { wr: number | null }) {
+  if (wr === null) return <span className="text-dim">—</span>;
+  const score = scoreOf(wr);
+  return <span className={scoreClass(score)}>{formatScore(score)}</span>;
+}
+
+function ScoreCard({
+  before,
+  after,
+  me,
+  shown,
+}: {
+  before: CardNumbers | null | undefined;
+  after: CardNumbers;
+  me: ChampionSummary | undefined;
+  shown: ChampionSummary;
+}) {
+  const prev = <K extends keyof CardNumbers>(k: K): CardNumbers[K] | null | undefined =>
+    before === undefined ? undefined : before === null ? null : before[k];
+  const oneSided = after.physical > 0.7 || after.physical < 0.3;
   return (
     <div className="space-y-3">
-      <div className="flex items-center gap-3 rounded-lg border border-line bg-surface p-3">
-        <ChampIcon version={version} id={me.id} name={me.name} size={48} />
-        <div className="min-w-0 flex-1">
-          <p className="flex items-center gap-2 font-display text-xl font-semibold">
-            <Link href={`/campeones/${me.id}?role=${stats.role}&rank=${rank}`} className="truncate hover:text-gold-soft">
-              {me.name}
-            </Link>
-            {stats.summary && <TierBadge tier={stats.summary.tier} />}
-          </p>
-          <p className="flex items-center gap-1.5 text-xs text-muted">
-            <RoleIcon role={stats.role} size={12} />
-            {ROLE_LABEL[stats.role]}
-            {!locked && " · sin bloquear"}
-          </p>
-        </div>
-      </div>
-
       <div className="grid grid-cols-2 gap-3">
-        <ScoreTile label="Victoria estimada" hint="Tu winrate general más el efecto de los campeones ya elegidos en ambos equipos.">
-          {draft.estimatedWinRate !== null ? pct(draft.estimatedWinRate) : "—"}
+        <ScoreTile label="Puntuación global" hint={`Cómo te va en este draft: tu winrate más el efecto de cada campeón elegido. ${SCORE_HINT}`}>
+          <Compare before={prev("global")} after={after.global} render={(v) => <Score wr={v} />} />
+          {after.global !== null && before === undefined && <span className="ml-2 text-sm font-normal text-muted">{pct(after.global)}</span>}
         </ScoreTile>
         <ScoreTile
           label="Fase de líneas"
           hint={
-            laneCell?.blind
-              ? "Rival de línea sin elegir: promedio contra todos los de tu línea."
-              : "Tu winrate contra el rival de tu línea."
+            after.laneBlind
+              ? `Rival de línea sin elegir: promedio contra todos los de tu línea. ${SCORE_HINT}`
+              : `Tu winrate contra el rival de tu línea. ${SCORE_HINT}`
           }
         >
-          {laneCell ? (
-            <>
-              {pct(laneCell.winRate)}
-              {laneCell.blind && <span className="text-loss">*</span>}
-            </>
-          ) : (
-            "—"
-          )}
+          <Compare before={prev("lane")} after={after.lane} render={(v) => <Score wr={v} />} />
+          {after.laneBlind && after.lane !== null && <span className="text-loss">*</span>}
         </ScoreTile>
       </div>
 
       <dl className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-lg border border-line bg-surface p-3">
         <Metric label="Maestría">
-          <MasteryPoints championKey={me.key} />
+          <Compare before={before === undefined ? undefined : (me?.key ?? null)} after={shown.key} render={(k) => <MasteryPoints championKey={k} />} />
         </Metric>
-        <Metric label="Winrate">
-          <span className={wrClass(stats.baseWinRate)}>{pct(stats.baseWinRate)}</span>
+        <Metric label="Winrate" hint="Winrate del campeón en tu línea, en todas las partidas.">
+          <Compare before={prev("winRate")} after={after.winRate} render={(v) => <span className={scoreClass(scoreOf(v))}>{pct(v)}</span>} />
         </Metric>
-        <Metric label="Sinergia promedio">
-          <AverageValue cells={allyCells} />
+        <Metric label="Sinergia promedio" hint={`Promedio con tus aliados (los que no eligieron cuentan por su línea). ${SCORE_HINT}`}>
+          <Compare before={prev("synergy")} after={after.synergy} render={(v) => <Score wr={v} />} />
         </Metric>
-        <Metric label="Counter promedio">
-          <AverageValue cells={enemyCells} />
+        <Metric label="Counter promedio" hint={`Promedio contra los rivales (los que no eligieron cuentan por su línea). ${SCORE_HINT}`}>
+          <Compare before={prev("counter")} after={after.counter} render={(v) => <Score wr={v} />} />
         </Metric>
       </dl>
 
-      <div className="space-y-3 rounded-lg border border-line bg-surface p-3 text-sm">
-        <div>
-          <p className="mb-1.5 flex justify-between text-xs text-muted">
-            <span>Daño físico {pct(physicalShare, 0)}</span>
-            <span>Mágico {pct(1 - physicalShare, 0)}</span>
-          </p>
-          <div className="flex h-2 overflow-hidden rounded-full bg-night">
-            <div className="bg-loss/80" style={{ width: `${physicalShare * 100}%` }} />
-            <div className="flex-1 bg-hex/80" />
-          </div>
-          {(physicalShare > 0.7 || physicalShare < 0.3) && team.length >= 3 && (
-            <p className="mt-1.5 text-xs text-gold-soft">
-              Tu equipo hace casi todo daño {physicalShare > 0.7 ? "físico" : "mágico"}: al rival le basta con comprar{" "}
-              {physicalShare > 0.7 ? "armadura" : "resistencia mágica"}.
-            </p>
-          )}
-        </div>
+      <div className="space-y-2.5 rounded-lg border border-line bg-surface p-3 text-sm">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs text-muted">Oro al 15 contra tu rival</span>
-          {opp?.lane ? (
-            <span className={opp.lane.gold15 >= 0 ? "text-win" : "text-loss"}>
-              {opp.lane.gold15 >= 0 ? "+" : "−"}
-              {Math.round(Math.abs(opp.lane.gold15))}
-            </span>
-          ) : (
-            <span className="text-dim">—</span>
-          )}
+          <span className="text-xs text-muted" title="Parte del daño de tu equipo que es físico, según los campeones ya elegidos.">
+            Daño físico del equipo
+          </span>
+          <Compare
+            before={prev("physical")}
+            after={after.physical}
+            render={(v) => <span className={v > 0.7 || v < 0.3 ? "text-gold-soft" : "text-ink"}>{pct(v)}</span>}
+          />
         </div>
-        {reason && oppChamp && (
+        <div className="flex h-1.5 overflow-hidden rounded-full bg-night" aria-hidden="true">
+          <div className="bg-loss/80" style={{ width: `${after.physical * 100}%` }} />
+          <div className="flex-1 bg-hex/80" />
+        </div>
+        {oneSided && (
+          <p className="text-xs text-gold-soft">
+            Tu equipo hace casi todo daño {after.physical > 0.7 ? "físico" : "mágico"}: al rival le basta con comprar{" "}
+            {after.physical > 0.7 ? "armadura" : "resistencia mágica"}.
+          </p>
+        )}
+        <div className="flex items-baseline justify-between gap-3">
+          <span className="text-xs text-muted" title={`Diferencia de oro al minuto 15 contra tu rival de línea. ${SCORE_HINT}`}>
+            Ventaja temprana
+          </span>
+          <Compare
+            before={prev("gold15")}
+            after={after.gold15}
+            render={(v) =>
+              v === null ? (
+                <span className="text-dim">—</span>
+              ) : (
+                <span className="inline-flex items-baseline gap-1.5">
+                  <span className={`font-semibold ${scoreClass(goldScore(v))}`}>{formatScore(goldScore(v))}</span>
+                  <span className="text-xs text-muted">
+                    {v >= 0 ? "+" : "−"}
+                    {Math.round(Math.abs(v))} de oro
+                  </span>
+                </span>
+              )
+            }
+          />
+        </div>
+        {after.reason && after.opponent && (
           <p className="border-t border-line/60 pt-2 text-xs text-muted">
-            <span className="text-ink">Contra {oppChamp.name}:</span> {reason}
+            <span className="text-ink">Contra {after.opponent.name}:</span> {after.reason}
           </p>
         )}
       </div>
@@ -465,9 +605,9 @@ function ScoreTile({ label, hint, children }: { label: string; hint: string; chi
   );
 }
 
-function Metric({ label, children }: { label: string; children: React.ReactNode }) {
+function Metric({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div>
+    <div title={hint}>
       <dt className="text-xs text-muted">{label}</dt>
       <dd className="font-display text-xl font-semibold">{children}</dd>
     </div>
@@ -477,8 +617,69 @@ function Metric({ label, children }: { label: string; children: React.ReactNode 
 function AverageValue({ cells }: { cells: EncounterCell[] }) {
   const withData = cells.filter((c) => c.games > 0);
   if (!withData.length) return <span className="text-dim">—</span>;
-  const avg = withData.reduce((s, c) => s + c.winRate, 0) / withData.length;
-  return <span className={wrClass(avg)}>{pct(avg)}</span>;
+  return <Score wr={withData.reduce((s, c) => s + c.winRate, 0) / withData.length} />;
+}
+
+/* ---------- Recomendaciones ---------- */
+
+/** Grilla con los mejores picks para tu línea en este draft; tocar uno lo deja en vista previa. */
+function Recommendations({
+  picks,
+  me,
+  shown,
+  champs,
+  version,
+  baseQuery,
+}: {
+  picks: DraftPick[];
+  me: ChampionSummary | undefined;
+  shown: ChampionSummary;
+  champs: Champs;
+  version: string;
+  baseQuery: string;
+}) {
+  const selected = picks.find((p) => p.key === shown.key);
+  return (
+    <div>
+      <p className="mb-2 text-xs text-dim">
+        Picks de {ROLE_LABEL[picks[0].role].toLowerCase()} según tus aliados y los rivales que ya eligieron. Toca uno para compararlo.
+      </p>
+      <ul className="grid grid-cols-5 gap-2">
+        {picks.map((p) => {
+          const c = champs[p.key];
+          if (!c) return null;
+          const score = scoreOf(p.winRate);
+          const ring = p.key === shown.key ? "ring-2 ring-gold" : p.key === me?.key ? "ring-2 ring-hex/70" : "ring-1 ring-line";
+          return (
+            <li key={p.key}>
+              <Link
+                href={`/en-vivo?${baseQuery}&ver=${p.key}`}
+                scroll={false}
+                className="group block text-center"
+                title={`${c.name}: ${pct(p.winRate)} esperado${p.reasons.length ? `. ${p.reasons.map((r) => r.text).join("; ")}` : ""}`}
+              >
+                <span className={`block overflow-hidden rounded-md ${ring} group-hover:ring-gold/70`}>
+                  <ChampIcon version={version} id={c.id} name={c.name} size={52} className="h-auto w-full" />
+                </span>
+                <span className={`mt-1 block font-display text-sm font-semibold ${scoreClass(score)}`}>{formatScore(score)}</span>
+              </Link>
+            </li>
+          );
+        })}
+      </ul>
+      {selected && selected.reasons.length > 0 && (
+        <p className="mt-3 border-t border-line/60 pt-2 text-xs">
+          <span className="text-ink">{champs[selected.key]?.name}: </span>
+          {selected.reasons.map((r, i) => (
+            <span key={r.text} className={r.delta >= 0 ? "text-win" : "text-loss"}>
+              {i > 0 && <span className="text-dim">; </span>}
+              {r.text}
+            </span>
+          ))}
+        </p>
+      )}
+    </div>
+  );
 }
 
 /* ---------- Encuentros ---------- */
@@ -511,8 +712,8 @@ function Encounters({ me, draft, champs, version }: { me: ChampionSummary; draft
         ))}
       </div>
       <p className="mt-3 text-xs text-muted">
-        <span className="text-loss">*</span> Todavía sin campeón: se usa tu winrate promedio con ese rol. Los valores son tu winrate en esa
-        situación; el número chico es la diferencia con tu winrate general.
+        <span className="text-loss">*</span> Todavía sin campeón: se usa tu promedio contra esa línea. Puntaje de 0 a 5 (2.5 es parejo,
+        desde 3 es ventaja); debajo, tu winrate en ese cruce.
       </p>
     </section>
   );
@@ -601,91 +802,19 @@ function Pair({
 
 function CellValue({ cell, className = "" }: { cell: EncounterCell; className?: string }) {
   if (cell.games === 0) return <span className={`text-dim ${className}`}>—</span>;
+  const score = scoreOf(cell.winRate);
   return (
-    <span className={`leading-tight ${className}`} title={`${compact(cell.games)} partidas`}>
-      <span className={`block font-display text-xl font-semibold ${wrClass(cell.winRate)}`}>
-        {pct(cell.winRate)}
+    <span className={`leading-tight ${className}`} title={`${pct(cell.winRate)} en ${compact(cell.games)} partidas`}>
+      <span className={`block font-display text-xl font-semibold ${scoreClass(score)}`}>
+        {formatScore(score)}
         {cell.blind && <span className="text-loss">*</span>}
       </span>
-      <span className={`text-xs ${cell.delta >= 0 ? "text-win" : "text-loss"}`}>
-        {cell.delta >= 0 ? "+" : "−"}
-        {pct(Math.abs(cell.delta))}
-      </span>
+      <span className="text-xs text-dim">{pct(cell.winRate)}</span>
     </span>
   );
 }
 
-/* ---------- Build ---------- */
-
-/* ---------- Qué elegir contra el rival de línea ---------- */
-
-/** Mejores picks para tu línea en este draft (antes de bloquear). */
-async function DraftPicks({
-  role,
-  allies,
-  enemies,
-  unavailable,
-  rank,
-  champs,
-  version,
-  limit,
-  current,
-}: {
-  role: Role;
-  allies: DraftSlot[];
-  enemies: DraftSlot[];
-  unavailable: string[];
-  rank: RankFilter;
-  champs: Champs;
-  version: string;
-  limit: number;
-  /** Campeón que tienes en mente: se marca si aparece en la lista. */
-  current?: string;
-}) {
-  const picks = await getDraftPicks(role, allies, enemies, unavailable, rank, limit);
-  if (!picks.length) return null;
-  return (
-    <section className="rounded-lg border border-line bg-surface p-3" aria-labelledby="draft-picks">
-      <h2 id="draft-picks" className="font-display text-lg font-semibold">
-        Mejores picks de {ROLE_LABEL[role].toLowerCase()} para este draft
-      </h2>
-      <p className="mb-2 text-xs text-dim">Winrate esperado según tus aliados y los rivales que ya eligieron.</p>
-      <ul className="space-y-0.5">
-        {picks.map((p) => {
-          const c = champs[p.key];
-          if (!c) return null;
-          return (
-            <li key={p.key}>
-              <Link
-                href={`/campeones/${c.id}?role=${p.role}&rank=${rank}`}
-                className={`flex gap-3 rounded-md px-1.5 py-1.5 hover:bg-raised ${p.key === current ? "bg-gold/10 ring-1 ring-gold/40" : ""}`}
-              >
-                <ChampIcon version={version} id={c.id} name={c.name} size={32} />
-                <span className="min-w-0 flex-1">
-                  <span className="flex items-center gap-2">
-                    <span className="flex-1 truncate font-medium">{c.name}</span>
-                    <TierBadge tier={p.tier.tier} />
-                    <span className={`w-12 text-right text-sm ${wrClass(p.winRate)}`}>{pct(p.winRate)}</span>
-                  </span>
-                  {p.reasons.length > 0 && (
-                    <span className="mt-0.5 block truncate text-xs">
-                      {p.reasons.map((r, i) => (
-                        <span key={r.text} className={r.delta >= 0 ? "text-win" : "text-loss"}>
-                          {i > 0 && <span className="text-dim">; </span>}
-                          {r.text}
-                        </span>
-                      ))}
-                    </span>
-                  )}
-                </span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-    </section>
-  );
-}
+/* ---------- Emparejamiento ---------- */
 
 /**
  * Con el campeón ya bloqueado: lo que no está en el resto de la pantalla.
@@ -702,7 +831,7 @@ async function EnemyIntel({ draft, champs, version }: { draft: DraftInsights; ch
   if (!tips.length && team.length < 2) return null;
 
   return (
-    <section className="space-y-3 rounded-lg border border-line bg-surface p-3 text-sm">
+    <section className="space-y-3 text-sm">
       {opp && tips.length > 0 && (
         <div>
           <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-semibold">

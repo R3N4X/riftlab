@@ -989,9 +989,9 @@ export async function getDraftInsights(
     };
   });
 
-  // Efecto de lo ya elegido (las celdas a ciegas no suman: son el promedio).
-  const known = encounters.flatMap((e) => [e.ally, e.enemy]).filter((c): c is EncounterCell => c !== null && !c.blind);
-  const estimatedWinRate = Math.min(0.7, Math.max(0.3, base + known.reduce((s, c) => s + c.delta, 0)));
+  // Mismo cálculo que las recomendaciones (los cruces sin campeón no suman: son el promedio).
+  const fit = draftFit(ds, rank, self.key, self.role, myTeam.slice(1), theirTeam, (k) => champsByKey[k]?.name ?? k);
+  const estimatedWinRate = fit.winRate;
 
   return { ...empty, laneOpponent, versus, synergy, encounters, baseWinRate: base, estimatedWinRate };
 }
@@ -1033,6 +1033,67 @@ const OTHER = { weight: 0.35, k: 200 };
 const MAX_DRAFT_EFFECT = 0.06;
 
 /**
+ * Winrate esperado de un campeón en un rol para este draft: su winrate en el rol (encogido hacia
+ * 50 % con pocas partidas) más lo que gana o pierde contra cada rival y con cada aliado, con el
+ * peso de cada cruce y un tope. Lo usan las recomendaciones y la puntuación global, así el mismo
+ * campeón tiene el mismo número en los dos lugares.
+ */
+function draftFit(
+  ds: MetaDataset,
+  rank: RankFilter,
+  key: string,
+  role: Role,
+  myTeam: { key: string; role: Role }[],
+  theirTeam: { key: string; role: Role }[],
+  name: (key: string) => string,
+): { winRate: number; reasons: DraftPickReason[] } {
+  const roleAgg = ds.champions[key]?.roles[role];
+  const all = sumTiers(roleAgg?.byTier, "ALL");
+  const base = all.games ? all.wins / all.games : 0.5;
+  const meId = `${key}:${role}`;
+  const effects: DraftPickReason[] = [];
+  let total = 0;
+
+  for (const e of theirTeam) {
+    if (e.role === role) {
+      const c = roleAgg?.matchups[e.key];
+      if (!c?.games) continue;
+      const d = shrunkDelta(c, base, LANE.k) * LANE.weight;
+      total += d;
+      effects.push({ text: d >= 0 ? `Le gana a ${name(e.key)} en línea` : `Sufre contra ${name(e.key)} en línea`, delta: d });
+    } else {
+      const pk = pairKey(key, role, e.key, e.role);
+      const c = ds.enemies?.[pk];
+      if (!c?.games) continue;
+      // En enemies las victorias son del primero de la clave.
+      const mine = pk.startsWith(meId) ? c : { games: c.games, wins: c.games - c.wins };
+      const d = shrunkDelta(mine, base, OTHER.k) * OTHER.weight;
+      total += d;
+      effects.push({ text: d >= 0 ? `Le va bien contra ${name(e.key)}` : `Le cuesta ${name(e.key)}`, delta: d });
+    }
+  }
+  for (const a of myTeam) {
+    if (!a.key) continue;
+    const duo = (role === "BOTTOM" && a.role === "UTILITY") || (role === "UTILITY" && a.role === "BOTTOM");
+    const c = duo
+      ? sumTiers(ds.duos[role === "BOTTOM" ? `${key}-${a.key}` : `${a.key}-${key}`], rank)
+      : ds.teammates[pairKey(key, role, a.key, a.role)];
+    if (!c?.games) continue;
+    const { weight, k } = duo ? DUO : OTHER;
+    const d = shrunkDelta(c, base, k) * weight;
+    total += d;
+    effects.push({ text: d >= 0 ? `Buena pareja con ${name(a.key)}` : `No combina con ${name(a.key)}`, delta: d });
+  }
+
+  // El winrate del rol también se encoge: un campeón con pocas partidas no queda primero por suerte.
+  const draft = Math.max(-MAX_DRAFT_EFFECT, Math.min(MAX_DRAFT_EFFECT, total));
+  return {
+    winRate: 0.5 + shrunkDelta(all, 0.5, 150) + draft,
+    reasons: effects.filter((e) => Math.abs(e.delta) >= 0.005).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)),
+  };
+}
+
+/**
  * Candidatos para tu línea ordenados por cómo encajan en el draft: su winrate
  * en el rol más lo que ganan o pierden contra cada rival elegido (el de la
  * línea pesa más) y con cada aliado. Solo entran campeones que de verdad se
@@ -1067,52 +1128,8 @@ export async function getDraftPicks(
     .slice(0, 40);
 
   const picks = candidates.map((row): DraftPick => {
-    const key = row.champion.key;
-    const roleAgg = ds.champions[key]?.roles[role];
-    const all = sumTiers(roleAgg?.byTier, "ALL");
-    const base = all.games ? all.wins / all.games : 0.5;
-    const meId = `${key}:${role}`;
-    const effects: DraftPickReason[] = [];
-    let total = 0;
-
-    for (const e of theirTeam) {
-      if (e.role === role) {
-        const c = roleAgg?.matchups[e.key];
-        if (!c?.games) continue;
-        const d = shrunkDelta(c, base, LANE.k) * LANE.weight;
-        total += d;
-        effects.push({ text: d >= 0 ? `Le gana a ${name(e.key)} en línea` : `Sufre contra ${name(e.key)} en línea`, delta: d });
-      } else {
-        const pk = pairKey(key, role, e.key, e.role);
-        const c = ds.enemies?.[pk];
-        if (!c?.games) continue;
-        // En enemies las victorias son del primero de la clave.
-        const mine = pk.startsWith(meId) ? c : { games: c.games, wins: c.games - c.wins };
-        const d = shrunkDelta(mine, base, OTHER.k) * OTHER.weight;
-        total += d;
-        effects.push({ text: d >= 0 ? `Le va bien contra ${name(e.key)}` : `Le cuesta ${name(e.key)}`, delta: d });
-      }
-    }
-    for (const a of myTeam) {
-      const duo = (role === "BOTTOM" && a.role === "UTILITY") || (role === "UTILITY" && a.role === "BOTTOM");
-      const c = duo
-        ? sumTiers(ds.duos[role === "BOTTOM" ? `${key}-${a.key}` : `${a.key}-${key}`], rank)
-        : ds.teammates[pairKey(key, role, a.key, a.role)];
-      if (!c?.games) continue;
-      const { weight, k } = duo ? DUO : OTHER;
-      const d = shrunkDelta(c, base, k) * weight;
-      total += d;
-      effects.push({ text: d >= 0 ? `Buena pareja con ${name(a.key)}` : `No combina con ${name(a.key)}`, delta: d });
-    }
-
-    // El winrate del rol también se encoge: un campeón con pocas partidas no queda primero por suerte.
-    const draft = Math.max(-MAX_DRAFT_EFFECT, Math.min(MAX_DRAFT_EFFECT, total));
-    const winRate = 0.5 + shrunkDelta(all, 0.5, 150) + draft;
-    const reasons = effects
-      .filter((e) => Math.abs(e.delta) >= 0.005)
-      .sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta))
-      .slice(0, 2);
-    return { key, role, tier: row, winRate, reasons };
+    const fit = draftFit(ds, rank, row.champion.key, role, myTeam, theirTeam, name);
+    return { key: row.champion.key, role, tier: row, winRate: fit.winRate, reasons: fit.reasons.slice(0, 2) };
   });
 
   return picks.sort((a, b) => b.winRate - a.winRate).slice(0, limit);

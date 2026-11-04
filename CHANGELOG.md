@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.21 (04-11-2026)
+
+- Worlds: DK ya aparece en su cruce de cuartos contra BLG (Leaguepedia lo escribía con otras mayúsculas y quedaba "Por definir").
+
 ## 0.2.20 (04-11-2026)
 
 - Pestaña "Bloqueos" en la selección: sugiere qué bloquear según tu línea (los rivales que más les cuestan a los campeones que más juegas o, si no hay datos tuyos, los más fuertes de la línea). Al tocar uno queda marcado en el cliente, sin confirmar el bloqueo, cuando es tu turno.

@@ -40,7 +40,7 @@
     "tsx": "^4.23.15",
     "typescript": "^5"
   },
-  "description": "RiftLab: estadÃƒÆ’Ã†â€™Ãƒâ€šÃ‚Â­sticas de League of Legends y TFT",
+  "description": "RiftLab: estadísticas de League of Legends y TFT",
   "author": "RiftLab",
   "build": {
     "appId": "com.riftlab.app",

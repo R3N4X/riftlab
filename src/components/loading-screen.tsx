@@ -109,7 +109,16 @@ export function LoadingScreen({
           </h2>
           <ul className="grid grid-cols-2 gap-2 md:grid-cols-3 xl:grid-cols-5">
             {team.map((p) => (
-              <PlayerCard key={p.puuid} p={p} champs={champs} spells={spells} version={version} ally={i === 0} platform={platform!} />
+              <PlayerCard
+                key={`${p.teamId}-${p.championId}`}
+                p={p}
+                mates={p.premade ? team.filter((x) => x !== p && x.premade?.group === p.premade!.group).map((x) => x.gameName) : []}
+                champs={champs}
+                spells={spells}
+                version={version}
+                ally={i === 0}
+                platform={platform!}
+              />
             ))}
           </ul>
         </div>
@@ -170,8 +179,37 @@ function flagsFor(p: LivePlayerInfo, champName: string): Flag[] {
   return flags.slice(0, 3);
 }
 
+/** Un color por grupo de premades, para reconocerlos de un vistazo (el texto dice con quién). */
+const PREMADE_COLORS = ["#c9a45c", "#4fa3d9", "#b48ef0", "#e58fc4"];
+const GROUP_NAME = ["", "", "Dúo", "Trío", "Grupo de 4", "Grupo de 5"];
+
+/** "A", "A y B", "A, B y C". */
+const joinNames = (names: string[]) => (names.length < 2 ? names.join("") : `${names.slice(0, -1).join(", ")} y ${names.at(-1)}`);
+
+function PremadeBadge({ group, games, mates }: { group: number; games: number; mates: string[] }) {
+  const color = PREMADE_COLORS[(group - 1) % PREMADE_COLORS.length];
+  const size = mates.length + 1;
+  const sure = games >= 2;
+  return (
+    <p
+      className="mx-2.5 mb-2 flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-[11px] leading-tight"
+      style={{ borderColor: `${color}80`, color, backgroundColor: `${color}14` }}
+      title={`Jugaron juntos en ${games} de sus últimas partidas${sure ? "" : ": puede ser casualidad"}.`}
+    >
+      <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
+        <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
+        <path d="M14 11a5 5 0 0 0-7.5-.5l-3 3a5 5 0 0 0 7 7l1.7-1.7" />
+      </svg>
+      <span className="min-w-0 truncate">
+        {sure ? GROUP_NAME[size] ?? "Premade" : `Posible ${(GROUP_NAME[size] ?? "premade").toLowerCase()}`} con {joinNames(mates)}
+      </span>
+    </p>
+  );
+}
+
 function PlayerCard({
   p,
+  mates,
   champs,
   spells,
   version,
@@ -179,6 +217,8 @@ function PlayerCard({
   platform,
 }: {
   p: LivePlayerInfo;
+  /** Nombres de los premades del mismo grupo (vacío si juega solo). */
+  mates: string[];
   champs: Champs;
   spells: Spells;
   version: string;
@@ -192,9 +232,12 @@ function PlayerCard({
   const main = p.mainRole;
   // Autofill: juega una línea distinta de la que más juega, y esa línea es clara (al menos la mitad de su juego).
   const autofill = Boolean(p.role && main && main.role !== p.role && main.share >= 0.5);
+  const premadeColor = p.premade && mates.length ? PREMADE_COLORS[(p.premade.group - 1) % PREMADE_COLORS.length] : null;
   return (
     <li
       className={`flex flex-col overflow-hidden rounded-lg border bg-surface ${p.isMe ? "border-gold/70" : ally ? "border-hex/30" : "border-loss/30"}`}
+      // Franja arriba con el color del grupo: los premades se reconocen sin leer.
+      style={premadeColor ? { boxShadow: `inset 0 3px 0 ${premadeColor}` } : undefined}
     >
       {/* Splash horizontal: la cara del campeón queda dentro del recuadro. */}
       <div className="relative h-28">
@@ -237,6 +280,7 @@ function PlayerCard({
           {p.gameName}
           <span className="text-dim">#{p.tagLine}</span>
         </Link>
+        {p.premade && mates.length > 0 && <PremadeBadge group={p.premade.group} games={p.premade.games} mates={mates} />}
 
         {/* Rango */}
         <div className="flex items-center gap-2 border-t border-line/60 px-2.5 py-2">

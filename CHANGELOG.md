@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.19 (04-11-2026)
+
+- La pantalla de carga marca a los premades de los dos equipos: una franja del mismo color arriba de sus tarjetas y "Dúo con X" (o trío, grupo de 4...). Se deduce de sus últimas partidas: con 2 o más juntos es premade; con una sola dice "Posible", porque puede ser casualidad.
+
 ## 0.2.18 (01-11-2026)
 
 - Selección de campeones renovada: cada campeón se evalúa con puntajes de 0 a 5 (2.5 es parejo, desde 3 es ventaja) en la puntuación global, la fase de líneas, la sinergia, el counter y la ventaja temprana.

@@ -65,6 +65,55 @@ export interface LivePlayerInfo {
    * y las líneas de sus últimas partidas. `share` es qué parte de su juego representa (0 a 1).
    */
   mainRole: { role: Role; share: number } | null;
+  /**
+   * Grupo de premades: los jugadores del mismo equipo con el mismo `group` jugaron juntos en sus
+   * últimas partidas. `games` es cuántas de esas partidas compartió con alguien del grupo.
+   */
+  premade: { group: number; games: number } | null;
+}
+
+/**
+ * Premades: Riot no dice quién entró en grupo, pero se deduce de las últimas partidas que ya se
+ * piden para "Últimas" (sin consultas extra): dos jugadores del mismo equipo que en alguna de
+ * ellas estuvieron en el mismo equipo. Con una sola partida juntos puede ser casualidad (sobre todo
+ * en rangos altos, donde juegan pocos), por eso la pantalla distingue 1 partida de 2 o más.
+ */
+function findPremades(players: LivePlayerInfo[], matchesOf: Map<string, Match[]>): Map<string, { group: number; games: number }> {
+  const parent = new Map(players.map((p) => [p.puuid, p.puuid]));
+  const find = (x: string): string => (parent.get(x) === x ? x : find(parent.get(x)!));
+  const together = new Map<string, number>();
+
+  for (const [i, a] of players.entries()) {
+    for (const b of players.slice(i + 1)) {
+      // Riot oculta el puuid de algunos jugadores (llega vacío): con ellos no se puede saber.
+      if (a.teamId !== b.teamId || !a.puuid || !b.puuid) continue;
+      // Las partidas de los dos, sin repetir las que ya aparecen en ambas listas.
+      const seen = new Set<string>();
+      let games = 0;
+      for (const m of [...(matchesOf.get(a.puuid) ?? []), ...(matchesOf.get(b.puuid) ?? [])]) {
+        if (seen.has(m.metadata.matchId)) continue;
+        seen.add(m.metadata.matchId);
+        const pa = m.info.participants.find((x) => x.puuid === a.puuid);
+        const pb = m.info.participants.find((x) => x.puuid === b.puuid);
+        if (pa && pb && pa.teamId === pb.teamId) games++;
+      }
+      if (!games) continue;
+      parent.set(find(a.puuid), find(b.puuid));
+      for (const id of [a.puuid, b.puuid]) together.set(id, Math.max(together.get(id) ?? 0, games));
+    }
+  }
+
+  // Un número por grupo, en el orden de la partida.
+  const numbers = new Map<string, number>();
+  const result = new Map<string, { group: number; games: number }>();
+  for (const p of players) {
+    const games = together.get(p.puuid);
+    if (!games) continue;
+    const root = find(p.puuid);
+    if (!numbers.has(root)) numbers.set(root, numbers.size + 1);
+    result.set(p.puuid, { group: numbers.get(root)!, games });
+  }
+  return result;
 }
 
 type RoleGames = Record<string, Partial<Record<Role, number>>>;
@@ -136,6 +185,8 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
 
   const classic = game.gameMode === "CLASSIC";
   const roleGames = classic ? await getChampionRoleGames().catch(() => null) : null;
+  // Partidas recientes de cada jugador, también para encontrar premades.
+  const matchesOf = new Map<string, Match[]>();
 
   const players = await Promise.all(
     game.participants.map(async (p): Promise<LivePlayerInfo> => {
@@ -158,6 +209,7 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
           const matches = (await Promise.all(ids.map((id) => getMatch(platform, id).catch(() => null)))).filter(
             (m): m is Match => m !== null,
           );
+          matchesOf.set(p.puuid, matches);
           recent = matches.flatMap((m) => {
             const me = m.info.participants.find((x) => x.puuid === p.puuid);
             if (!me || m.info.gameDuration < 300) return [];
@@ -193,9 +245,13 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
         recent,
         role: null,
         mainRole: classic ? mainRoleOf(top, recent, roleGames) : null,
+        premade: null,
       };
     }),
   );
+
+  const premades = findPremades(players, matchesOf);
+  for (const p of players) p.premade = premades.get(p.puuid) ?? null;
 
   // En la Grieta cada equipo se ordena por línea: así cada jugador queda frente a su rival.
   if (classic) {

@@ -43,6 +43,8 @@ export interface LiveChampSelect {
   timerPhase: string | null;
   /** Cola (420 = clasificatoria solo/dúo...) si el cliente la informa. */
   queueId: number | null;
+  /** Campeones que puedes elegir (los tuyos, sin bloqueados ni elegidos); null si el cliente no lo dijo. */
+  pickable: number[] | null;
 }
 
 /** Amigo de la lista del cliente y lo que está haciendo (sale del chat del cliente, no gasta consultas a Riot). */
@@ -212,6 +214,8 @@ export interface DesktopBridge {
   setApiKey(key: string): Promise<ActionResult>;
   importRunes(page: RunePagePayload): Promise<ActionResult>;
   setSpells(spell1Id: number, spell2Id: number): Promise<ActionResult>;
+  /** Deja el campeón seleccionado (sin fijarlo) en la selección de campeones. */
+  hoverChampion(championId: number): Promise<ActionResult>;
   /** Runas, hechizos (solo en la selección) y set de objetos de una vez. */
   importBuild(build: BuildPayload): Promise<ActionResult>;
   /** Guarda la comp en el Planificador de TFT del cliente y la deja como recordatorio en la partida. */

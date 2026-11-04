@@ -39,6 +39,7 @@ const bridge: DesktopBridge = {
   setApiKey: (key: string) => ipcRenderer.invoke("settings:api-key", key),
   importRunes: (page: RunePagePayload) => ipcRenderer.invoke("live:import-runes", page),
   setSpells: (spell1Id: number, spell2Id: number) => ipcRenderer.invoke("live:set-spells", spell1Id, spell2Id),
+  hoverChampion: (championId: number) => ipcRenderer.invoke("live:hover-champion", championId),
   importBuild: (build: BuildPayload) => ipcRenderer.invoke("live:import-build", build),
   exportTftPlan: (plan: TftPlanPayload) => ipcRenderer.invoke("tft:export-plan", plan),
   getLpChanges: () => ipcRenderer.invoke("lp:get"),

@@ -178,7 +178,7 @@ interface RawSession {
   localPlayerCellId: number;
   myTeam: RawPlayer[];
   theirTeam: RawPlayer[];
-  actions: { actorCellId: number; type: string; completed: boolean; championId: number }[][];
+  actions: { id: number; actorCellId: number; type: string; completed: boolean; championId: number }[][];
   bans?: { myTeamBans: number[]; theirTeamBans: number[] };
   timer?: { phase?: string };
   queueId?: number;
@@ -189,7 +189,7 @@ function toRole(position: string): Role | null {
   return (ROLES as readonly string[]).includes(p) ? (p as Role) : null;
 }
 
-function parseSession(s: RawSession): LiveChampSelect {
+function parseSession(s: RawSession, pickable: number[] | null): LiveChampSelect {
   const actions = s.actions.flat();
   const lockedCells = new Set(actions.filter((a) => a.type === "pick" && a.completed).map((a) => a.actorCellId));
   const myCells = new Set(s.myTeam.map((p) => p.cellId));
@@ -215,6 +215,7 @@ function parseSession(s: RawSession): LiveChampSelect {
     bans: { mine: bansOf(true, s.bans?.myTeamBans), theirs: bansOf(false, s.bans?.theirTeamBans) },
     timerPhase: s.timer?.phase ?? null,
     queueId: s.queueId ?? null,
+    pickable,
   };
 }
 
@@ -262,6 +263,7 @@ function parseGame(s: RawGameSession, puuid: string): LiveChampSelect | null {
     bans: { mine: [], theirs: [] },
     timerPhase: null,
     queueId: s.gameData?.queue?.id ?? null,
+    pickable: null,
   };
 }
 
@@ -479,8 +481,13 @@ export class LeagueClient {
 
     let champSelect = null;
     if (phase === "ChampSelect") {
-      const session = await request<RawSession>(this.creds, "GET", "/lol-champ-select/v1/session");
-      if (session.status === 200) champSelect = parseSession(session.data);
+      const [session, pickable] = await Promise.all([
+        request<RawSession>(this.creds, "GET", "/lol-champ-select/v1/session"),
+        // Para recomendar solo campeones que tienes y que nadie eligió ni bloqueó.
+        request<number[]>(this.creds, "GET", "/lol-champ-select/v1/pickable-champion-ids"),
+      ]);
+      const ids = pickable.status === 200 && Array.isArray(pickable.data) ? pickable.data : null;
+      if (session.status === 200) champSelect = parseSession(session.data, ids);
     }
 
     // Ya en partida: los equipos salen de la sesión de juego (se pide una vez por partida).
@@ -650,5 +657,23 @@ export class LeagueClient {
     return res.status >= 200 && res.status < 300
       ? { ok: true, message: "Hechizos de invocador actualizados." }
       : { ok: false, message: "Solo se pueden cambiar durante la selección de campeones." };
+  }
+
+  /**
+   * Deja el campeón seleccionado en tu turno de elegir, sin fijarlo (lo mismo que hacer clic en
+   * él en el cliente): fijarlo sigue siendo decisión del jugador. Antes de tu turno queda como
+   * intención, que tus aliados ven.
+   */
+  async hoverChampion(championId: number): Promise<ActionResult> {
+    if (!this.creds) return { ok: false, message: "El cliente de League no está abierto." };
+    const session = await request<RawSession>(this.creds, "GET", "/lol-champ-select/v1/session");
+    if (session.status !== 200) return { ok: false, message: "Solo durante la selección de campeones." };
+    const s = session.data;
+    const pick = s.actions.flat().find((a) => a.actorCellId === s.localPlayerCellId && a.type === "pick" && !a.completed);
+    if (!pick) return { ok: false, message: "Ya fijaste tu campeón." };
+    const res = await request(this.creds, "PATCH", `/lol-champ-select/v1/session/actions/${pick.id}`, { championId });
+    return res.status >= 200 && res.status < 300
+      ? { ok: true, message: "Campeón seleccionado en el cliente (sin fijar)." }
+      : { ok: false, message: "El cliente no dejó seleccionar ese campeón." };
   }
 }

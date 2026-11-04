@@ -62,7 +62,28 @@ function MyProfileLink({ pathname, onNavigate }: { pathname: string | null; onNa
  * La app de escritorio no tiene la barra del navegador: sin esto, al abrir el perfil de otro
  * jugador no había cómo volver. Atrás conserva la página anterior tal como estaba (scroll y
  * partidas desplegadas), así que se vuelve al lugar exacto.
+ *
+ * Solo aparece donde se llega desde otra página para mirar un detalle y volver (un perfil, una
+ * partida, el resumen, comparar): no en las secciones de la barra lateral, ni en lo que se abre
+ * desde la barra lateral (ahí se navega con la barra, no hacia atrás).
  */
+const DETAIL_PAGES = /^\/(invocador|resumen|espectar|comparar)(\/|$)/;
+
+/** Última página abierta desde la barra lateral. */
+let sidebarTarget: string | null = null;
+const sidebarListeners = new Set<() => void>();
+
+function rememberSidebarClick(event: React.MouseEvent) {
+  const link = (event.target as HTMLElement).closest("a");
+  if (!link || link.origin !== window.location.origin) return;
+  sidebarTarget = decodeURIComponent(link.pathname);
+  sidebarListeners.forEach((l) => l());
+}
+
+function subscribeSidebar(onChange: () => void) {
+  sidebarListeners.add(onChange);
+  return () => sidebarListeners.delete(onChange);
+}
 type NavigationLike = EventTarget & { canGoBack: boolean };
 const navigationApi = () => (window as unknown as { navigation?: NavigationLike }).navigation;
 
@@ -72,14 +93,20 @@ function subscribeHistory(onChange: () => void) {
   return () => nav?.removeEventListener("currententrychange", onChange);
 }
 
-function BackButton({ onNavigate }: { onNavigate: () => void }) {
+function BackButton({ pathname, onNavigate }: { pathname: string | null; onNavigate: () => void }) {
   const router = useRouter();
   const canGoBack = useSyncExternalStore(
     subscribeHistory,
     () => Boolean(window.riftlab) && (navigationApi()?.canGoBack ?? window.history.length > 1),
     () => false,
   );
-  if (!canGoBack) return null;
+  const fromSidebar = useSyncExternalStore(
+    subscribeSidebar,
+    () => sidebarTarget,
+    () => null,
+  );
+  const path = pathname ? decodeURIComponent(pathname) : null;
+  if (!canGoBack || !path || !DETAIL_PAGES.test(path) || path === fromSidebar) return null;
   return (
     <button
       type="button"
@@ -194,6 +221,7 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
       </div>
 
       <aside
+        onClickCapture={rememberSidebarClick}
         className={`${open ? "block" : "hidden"} fixed inset-x-0 top-[57px] z-20 border-b border-line bg-surface px-3 py-4 lg:sticky lg:top-[var(--titlebar-h)] lg:flex lg:h-[calc(100dvh-var(--titlebar-h))] lg:flex-col no-scrollbar lg:overflow-y-auto lg:w-60 lg:shrink-0 lg:border-r lg:border-b-0 lg:px-4 lg:py-6`}
       >
         <div className="mb-6 hidden px-2 lg:block">
@@ -203,7 +231,7 @@ export function NavView({ patch, version, champions, pathname }: NavProps & { pa
           <GlobalSearch champions={champions} version={version} />
         </div>
         <nav className="flex flex-col gap-1 lg:pb-4">
-          <BackButton onNavigate={() => setOpen(false)} />
+          <BackButton pathname={pathname} onNavigate={() => setOpen(false)} />
           <MyProfileLink pathname={pathname} onNavigate={() => setOpen(false)} />
           {LINKS.map((l) => {
             const active = pathname !== null && isActive(pathname, l.href);

@@ -658,6 +658,7 @@ ipcMain.handle("tft:export-plan", (_e, plan: TftPlanPayload) => league.exportTft
 ipcMain.handle("live:import-runes", (_e, page: RunePagePayload) => league.importRunes(page));
 ipcMain.handle("live:import-build", (_e, build: BuildPayload) => league.importBuild(build));
 ipcMain.handle("live:set-spells", (_e, spell1Id: number, spell2Id: number) => league.setSpells(Number(spell1Id), Number(spell2Id)));
+ipcMain.handle("live:hover-champion", (_e, championId: number) => league.hoverChampion(Number(championId)));
 
 /* ---------- Actualizaciones automáticas ---------- */
 

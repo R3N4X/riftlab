@@ -1106,6 +1106,8 @@ export async function getDraftPicks(
   unavailable: string[],
   rank: RankFilter,
   limit = 6,
+  /** Campeones que más juega el jugador: se evalúan aunque no estén entre los más fuertes del meta. */
+  pool: string[] = [],
 ): Promise<DraftPick[]> {
   "use cache";
   cacheLife("minutes");
@@ -1122,17 +1124,20 @@ export async function getDraftPicks(
     return total ? sumTiers(roles[role]?.byTier, "ALL").games / total : 0;
   };
 
-  const candidates = rows
+  const eligible = rows
     .filter((r) => r.role === role && !taken.has(r.champion.key) && roleShare(r.champion.key) >= MIN_ROLE_SHARE)
-    .sort((a, b) => b.score - a.score)
-    .slice(0, 40);
+    .sort((a, b) => b.score - a.score);
+  const own = new Set(pool);
+  const candidates = eligible.filter((r, i) => i < 40 || own.has(r.champion.key));
 
   const picks = candidates.map((row): DraftPick => {
     const fit = draftFit(ds, rank, row.champion.key, role, myTeam, theirTeam, name);
     return { key: row.champion.key, role, tier: row, winRate: fit.winRate, reasons: fit.reasons.slice(0, 2) };
   });
 
-  return picks.sort((a, b) => b.winRate - a.winRate).slice(0, limit);
+  // Los mejores para el draft y, además, los del jugador (la página separa unos de otros).
+  const sorted = picks.sort((a, b) => b.winRate - a.winRate);
+  return sorted.filter((p, i) => i < limit || own.has(p.key));
 }
 
 /* ---------- Objeto de soporte ---------- */

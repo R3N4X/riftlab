@@ -32,6 +32,7 @@ import { counterReason } from "@/lib/stats/reasons";
 import { BuildPacks, ItemsAndSkills } from "./build-panels";
 import { GameView } from "./game-view";
 import { PanelTabs } from "./panel-tabs";
+import { Recommendations } from "./recommendations";
 
 export const metadata: Metadata = { title: "En vivo" };
 
@@ -60,6 +61,24 @@ function parseSlots(value: string | undefined): DraftSlot[] {
     .filter((s) => /^\d+$/.test(s.key));
 }
 
+/** Hasta 40 keys de campeón ("103,222,...") para la lista de campeones propios. */
+const parseKeys40 = (value: string | undefined) =>
+  (value ?? "")
+    .split(",")
+    .filter((k) => /^\d+$/.test(k))
+    .slice(0, 40);
+
+/**
+ * Pick para la vista previa automática: el mejor de los tuyos si está a menos de 1,5 puntos de winrate
+ * del mejor del meta (jugar algo que dominas vale más que esa diferencia); si no, el mejor del meta.
+ */
+function bestPick(picks: DraftPick[], pool: string[]): string | null {
+  const best = picks[0];
+  if (!best) return null;
+  const own = picks.find((p) => pool.includes(p.key));
+  return own && own.winRate >= best.winRate - 0.015 ? own.key : best.key;
+}
+
 const parseKeys = (value: string | undefined) =>
   (value ?? "")
     .split(",")
@@ -83,6 +102,8 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
   const bans = { mine: parseKeys(parseString(sp, "bloqueos")), theirs: parseKeys(parseString(sp, "bloqueosRivales")) };
   const unavailable = [...bans.mine, ...bans.theirs];
   const verParam = parseString(sp, "ver");
+  // Campeones con más maestría del jugador (los manda la app de escritorio).
+  const pool = parseKeys40(parseString(sp, "mios"));
 
   const [version, champs, draft, spells, picks] = await Promise.all([
     getLatestVersion(),
@@ -90,12 +111,12 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
     getDraftInsights({ key: myKey, role: myRole }, allies, enemies, rank),
     getSummonerSpells(),
     // Con la línea conocida y sin fijar campeón se recomiendan picks (también al elegir primero).
-    myRole && !locked && !inGame ? getDraftPicks(myRole, allies, enemies, unavailable, rank, PICK_COUNT) : Promise.resolve([]),
+    myRole && !locked && !inGame ? getDraftPicks(myRole, allies, enemies, unavailable, rank, PICK_COUNT, pool) : Promise.resolve([]),
   ]);
   const me = myKey ? champs[myKey] : undefined;
   // En vista previa: el que tocaste en la grilla o, sin campeón propio todavía, el mejor pick.
   const chosen = verParam && /^\d+$/.test(verParam) && champs[verParam] && verParam !== myKey && !locked && !inGame ? verParam : null;
-  const previewKey = chosen ?? (!me ? (picks[0]?.key ?? null) : null);
+  const previewKey = chosen ?? (!me ? bestPick(picks, pool) : null);
   const preview = previewKey ? champs[previewKey] : undefined;
   const empty = !myKey && !myRole && !allies.length && !enemies.length;
   // Lo justo para la pantalla de carga (componente de cliente).
@@ -315,7 +336,18 @@ async function Dashboard({
       ? [
           {
             label: "Recomendaciones",
-            panel: <Recommendations picks={picks} me={me} shown={shown} champs={champs} version={version} baseQuery={baseQuery} />,
+            panel: (
+              <Recommendations
+                picks={picks.flatMap((p) =>
+                  champs[p.key] ? [{ key: p.key, id: champs[p.key].id, name: champs[p.key].name, winRate: p.winRate, reasons: p.reasons }] : [],
+                )}
+                roleLabel={ROLE_LABEL[picks[0].role].toLowerCase()}
+                shownKey={shown.key}
+                meKey={me?.key ?? null}
+                version={version}
+                baseQuery={baseQuery}
+              />
+            ),
           },
         ]
       : []),
@@ -618,68 +650,6 @@ function AverageValue({ cells }: { cells: EncounterCell[] }) {
   const withData = cells.filter((c) => c.games > 0);
   if (!withData.length) return <span className="text-dim">—</span>;
   return <Score wr={withData.reduce((s, c) => s + c.winRate, 0) / withData.length} />;
-}
-
-/* ---------- Recomendaciones ---------- */
-
-/** Grilla con los mejores picks para tu línea en este draft; tocar uno lo deja en vista previa. */
-function Recommendations({
-  picks,
-  me,
-  shown,
-  champs,
-  version,
-  baseQuery,
-}: {
-  picks: DraftPick[];
-  me: ChampionSummary | undefined;
-  shown: ChampionSummary;
-  champs: Champs;
-  version: string;
-  baseQuery: string;
-}) {
-  const selected = picks.find((p) => p.key === shown.key);
-  return (
-    <div>
-      <p className="mb-2 text-xs text-dim">
-        Picks de {ROLE_LABEL[picks[0].role].toLowerCase()} según tus aliados y los rivales que ya eligieron. Toca uno para compararlo.
-      </p>
-      <ul className="grid grid-cols-5 gap-2">
-        {picks.map((p) => {
-          const c = champs[p.key];
-          if (!c) return null;
-          const score = scoreOf(p.winRate);
-          const ring = p.key === shown.key ? "ring-2 ring-gold" : p.key === me?.key ? "ring-2 ring-hex/70" : "ring-1 ring-line";
-          return (
-            <li key={p.key}>
-              <Link
-                href={`/en-vivo?${baseQuery}&ver=${p.key}`}
-                scroll={false}
-                className="group block text-center"
-                title={`${c.name}: ${pct(p.winRate)} esperado${p.reasons.length ? `. ${p.reasons.map((r) => r.text).join("; ")}` : ""}`}
-              >
-                <span className={`block overflow-hidden rounded-md ${ring} group-hover:ring-gold/70`}>
-                  <ChampIcon version={version} id={c.id} name={c.name} size={52} className="h-auto w-full" />
-                </span>
-                <span className={`mt-1 block font-display text-sm font-semibold ${scoreClass(score)}`}>{formatScore(score)}</span>
-              </Link>
-            </li>
-          );
-        })}
-      </ul>
-      {selected && selected.reasons.length > 0 && (
-        <p className="mt-3 border-t border-line/60 pt-2 text-xs">
-          <span className="text-ink">{champs[selected.key]?.name}: </span>
-          {selected.reasons.map((r, i) => (
-            <span key={r.text} className={r.delta >= 0 ? "text-win" : "text-loss"}>
-              {i > 0 && <span className="text-dim">; </span>}
-              {r.text}
-            </span>
-          ))}
-        </p>
-      )}
-    </div>
-  );
 }
 
 /* ---------- Encuentros ---------- */

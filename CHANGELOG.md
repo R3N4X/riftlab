@@ -5,6 +5,10 @@ Cada versión publicada, de la más nueva a la más vieja. El texto de cada vers
 ## 0.2.19 (04-11-2026)
 
 - La pantalla de carga marca a los premades de los dos equipos: una franja del mismo color arriba de sus tarjetas y "Dúo con X" (o trío, grupo de 4...). Se deduce de sus últimas partidas: con 2 o más juntos es premade; con una sola dice "Posible", porque puede ser casualidad.
+- La build se importa sola aunque durante la selección estés en otra sección de la app (antes solo funcionaba con En vivo abierto).
+- Al tocar una recomendación, el campeón queda seleccionado en el cliente de League sin fijarlo: fijarlo sigue siendo tu decisión.
+- Las recomendaciones muestran primero "Tus campeones" (los que más juegas que encajan en el draft) y después los mejores para el draft. Solo aparecen campeones que tienes y que nadie eligió ni bloqueó.
+- El botón "Volver" aparece solo donde sirve: al abrir un perfil, una partida, un resumen o una comparación desde otra página. Ya no aparece en las secciones de la barra lateral ni en lo que se abre desde ella.
 
 ## 0.2.18 (01-11-2026)
 

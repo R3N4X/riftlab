@@ -152,6 +152,16 @@ const TIMER_LABEL: Record<string, string> = {
   GAME_STARTING: "La partida va a comenzar",
 };
 
+/** Los 30 campeones con más maestría (desde 20 mil puntos), separados por coma. */
+function masteryPool(mastery: Record<number, number> | null | undefined): string {
+  return Object.entries(mastery ?? {})
+    .filter(([, points]) => points >= 20_000)
+    .sort((a, b) => b[1] - a[1])
+    .slice(0, 30)
+    .map(([id]) => id)
+    .join(",");
+}
+
 /** Indicador de conexión de /en-vivo. Además mantiene la URL al día con la selección de campeones. */
 export function LiveSync() {
   const isDesktop = useIsDesktop();
@@ -164,8 +174,11 @@ export function LiveSync() {
   // solo se conserva la última si se pierde la conexión.
   const query = draft ? draftToQuery(draft, Boolean(state?.game && !state.champSelect)) : state?.connected ? "" : null;
   // La vista previa de una recomendación (?ver=) se conserva mientras dura la selección y no fijas campeón.
+  // Tus campeones con más maestría, para recomendarte también los que mejor juegas.
+  const pool = state?.champSelect ? masteryPool(state.mastery) : "";
+  const withPool = query && pool ? `${query}&mios=${pool}` : query;
   const preview = searchParams.get("ver");
-  const target = query && preview && state?.champSelect && !query.includes("fijo=1") ? `${query}&ver=${preview}` : query;
+  const target = withPool && preview && state?.champSelect && !withPool.includes("fijo=1") ? `${withPool}&ver=${preview}` : withPool;
   const currentQuery = searchParams.toString();
 
   useEffect(() => {
@@ -277,61 +290,100 @@ function listJoin(words: string[]): string {
   return words.length < 2 ? words.join("") : `${words.slice(0, -1).join(", ")} y ${words.at(-1)}`;
 }
 
-/**
- * Si el jugador lo activó en Ajustes, importa la build Top 1 una sola vez por
- * selección de campeones, sin tocar nada: cuando tu campeón está bloqueado y ya se ve el draft completo (etapa
- * final), así las botas y los objetos situacionales tienen en cuenta a todos
- * los rivales.
+/*
+ * Importación automática de la build Top 1 (si el jugador la activó en Ajustes), una vez por
+ * selección de campeones: cuando tu campeón está bloqueado y ya se ve el draft completo (etapa
+ * final), así las botas y los objetos situacionales tienen en cuenta a todos los rivales.
+ *
+ * Corre en el layout, no en la página En vivo: si el jugador se iba a otra sección durante la
+ * selección, la build no se importaba. La build sale de /api/en-vivo/build (la misma de En vivo).
  */
-export function AutoImportBuild({ championKey, build }: { championKey: string; build: BuildPayload }) {
+let autoImportResult: (ActionResult & { championKey: string; at: number }) | null = null;
+const autoImportListeners = new Set<() => void>();
+
+function publishAutoImport(result: typeof autoImportResult) {
+  autoImportResult = result;
+  autoImportListeners.forEach((l) => l());
+}
+
+function useAutoImportResult() {
+  return useSyncExternalStore(
+    (onChange) => {
+      autoImportListeners.add(onChange);
+      return () => autoImportListeners.delete(onChange);
+    },
+    () => autoImportResult,
+    () => null,
+  );
+}
+
+function AutoImporter() {
   const state = useLiveState();
-  const latest = useRef(build);
-  const [result, setResult] = useState<ActionResult | null>(null);
   // Solo si el jugador lo activó en Ajustes: importar sin que lo pida le quitaría la decisión.
   const settings = useDesktopSettings();
   const parts = settings?.autoImportParts;
   const enabled = Boolean(settings?.autoImport && parts && (parts.runes || parts.spells || parts.items));
-  const partsRef = useRef(parts);
-  useEffect(() => {
-    latest.current = build;
-    partsRef.current = parts;
-  });
 
   const cs = state?.champSelect;
   const me = cs?.myTeam.find((p) => p.isMe);
+  const championKey = me?.championId ? String(me.championId) : null;
   const ready =
-    state?.phase === "ChampSelect" &&
-    Boolean(me?.locked) &&
-    String(me?.championId) === championKey &&
-    (cs?.timerPhase === "FINALIZATION" || cs?.timerPhase === "GAME_STARTING");
+    state?.phase === "ChampSelect" && Boolean(me?.locked) && (cs?.timerPhase === "FINALIZATION" || cs?.timerPhase === "GAME_STARTING");
+  const role = me?.position ?? "";
+  const enemies =
+    cs?.theirTeam
+      .filter((p) => p.championId > 0)
+      .map((p) => p.championId)
+      .join(",") ?? "";
+  const partsRef = useRef(parts);
+  useEffect(() => {
+    partsRef.current = parts;
+  });
 
   useEffect(() => {
-    if (!enabled || !ready || autoImportedFor === championKey || !window.riftlab) return;
-    // Pequeña espera: la página termina de recibir el draft final antes de importar.
+    if (!enabled || !ready || !championKey || autoImportedFor === championKey || !window.riftlab) return;
+    // Pequeña espera: el draft final termina de llegar antes de importar.
     const timer = setTimeout(async () => {
       if (autoImportedFor === championKey) return;
       autoImportedFor = championKey;
       const p = partsRef.current ?? { runes: true, spells: true, items: true };
-      const b = latest.current;
-      // Solo las partes elegidas en Ajustes; importBuild salta las que van vacías.
-      const payload: BuildPayload = {
-        ...b,
-        runes: p.runes ? b.runes : null,
-        spells: p.spells ? b.spells : null,
-        blocks: p.items ? b.blocks : [],
-      };
       const names = [p.runes && "runas", p.spells && "hechizos", p.items && "objetos"].filter(Boolean) as string[];
       try {
-        const r = await window.riftlab!.importBuild(payload);
-        setResult({ ok: r.ok, message: r.ok ? `Build Top 1 importada sola: ${listJoin(names)}.` : r.message });
+        const res = await fetch(`/api/en-vivo/build?${new URLSearchParams({ yo: championKey, rol: role, rivales: enemies })}`);
+        if (!res.ok) throw new Error();
+        const b = (await res.json()) as BuildPayload;
+        // Solo las partes elegidas en Ajustes; importBuild salta las que van vacías.
+        const r = await window.riftlab!.importBuild({
+          ...b,
+          runes: p.runes ? b.runes : null,
+          spells: p.spells ? b.spells : null,
+          blocks: p.items ? b.blocks : [],
+        });
+        publishAutoImport({
+          ok: r.ok,
+          message: r.ok ? `Build Top 1 de ${b.championName} importada sola: ${listJoin(names)}.` : r.message,
+          championKey,
+          at: Date.now(),
+        });
       } catch {
-        setResult({ ok: false, message: "No se pudo importar la build automáticamente." });
+        publishAutoImport({
+          ok: false,
+          message: "No se pudo importar la build automáticamente.",
+          championKey,
+          at: Date.now(),
+        });
       }
     }, 1500);
     return () => clearTimeout(timer);
-  }, [enabled, ready, championKey]);
+  }, [enabled, ready, championKey, role, enemies]);
 
-  if (!result) return null;
+  return null;
+}
+
+/** Resultado de la importación automática, en la tarjeta de builds de En vivo. */
+export function AutoImportStatus({ championKey }: { championKey: string }) {
+  const result = useAutoImportResult();
+  if (!result || result.championKey !== championKey) return null;
   return (
     <p
       aria-live="polite"
@@ -393,18 +445,24 @@ export function LiveWatcher() {
       reviewedGame !== lastGame.gameId
     ) {
       reviewedGame = lastGame.gameId;
-      router.push(`/resumen/${summoner.platform}/${summoner.platform.toUpperCase()}_${lastGame.gameId}?yo=${encodeURIComponent(`${summoner.gameName}#${summoner.tagLine}`)}`);
+      router.push(
+        `/resumen/${summoner.platform}/${summoner.platform.toUpperCase()}_${lastGame.gameId}?yo=${encodeURIComponent(`${summoner.gameName}#${summoner.tagLine}`)}`,
+      );
     }
   }, [phase, tft, gameMode, pathname, router, lastGame, summoner]);
 
-  if (!isDesktop || pathname === "/en-vivo" || gameMode) return null;
+  if (!isDesktop || gameMode) return null;
+  if (pathname === "/en-vivo") return <AutoImporter />;
   return (
-    <Link
-      href="/en-vivo"
-      className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-full border border-line bg-surface/95 px-3 py-1.5 text-xs text-muted shadow-lg backdrop-blur hover:text-ink"
-    >
-      <span className={`h-2 w-2 rounded-full ${state?.connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
-      {state?.connected ? (PHASE_LABEL[state.phase] ?? "Cliente conectado") : "Cliente de League cerrado"}
-    </Link>
+    <>
+      <AutoImporter />
+      <Link
+        href="/en-vivo"
+        className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-full border border-line bg-surface/95 px-3 py-1.5 text-xs text-muted shadow-lg backdrop-blur hover:text-ink"
+      >
+        <span className={`h-2 w-2 rounded-full ${state?.connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
+        {state?.connected ? (PHASE_LABEL[state.phase] ?? "Cliente conectado") : "Cliente de League cerrado"}
+      </Link>
+    </>
   );
 }

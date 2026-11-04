@@ -42,7 +42,8 @@ export interface WorldsResults {
 }
 
 function teamCode(name: string): TeamCode | null {
-  const clean = name.trim();
+  // La wiki no es pareja con las mayúsculas: en la misma página aparece "DPLUS" y "Dplus".
+  const clean = name.trim().toUpperCase();
   if (!clean) return null;
   if (clean in WIKI_ALIASES) return WIKI_ALIASES[clean];
   if (clean in TEAMS) return clean as TeamCode;

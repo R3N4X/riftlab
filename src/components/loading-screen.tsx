@@ -98,6 +98,9 @@ export function LoadingScreen({
     players.filter((p) => p.teamId === myTeam).map((p) => withLane(p, true)).sort(byLane),
     players.filter((p) => p.teamId !== myTeam).map((p) => withLane(p, false)),
   ];
+  // Tu rival de línea: el del otro equipo en tu misma línea (solo en tu partida, no al mirar la de un amigo).
+  const myRole = teams[0].find((p) => p.isMe)?.role ?? null;
+  const rival = !preview && myRole ? (teams[1].find((p) => p.role === myRole) ?? null) : null;
 
   return (
     <section className="space-y-3" aria-label="Jugadores de la partida">
@@ -117,12 +120,65 @@ export function LoadingScreen({
                 spells={spells}
                 version={version}
                 ally={i === 0}
+                rival={p === rival}
                 platform={platform!}
               />
             ))}
           </ul>
         </div>
       ))}
+      {rival && champs[rival.championId] && (
+        <LaneRival championKey={String(rival.championId)} role={rival.role!} champ={champs[rival.championId]} version={version} />
+      )}
+    </section>
+  );
+}
+
+type RivalInfo = { tips: string[]; items: { id: string; name: string }[] };
+
+/** Consejos para jugarle a tu rival de línea y la build que más arma (una consulta por partida). */
+function LaneRival({ championKey, role, champ, version }: { championKey: string; role: string; champ: { id: string; name: string }; version: string }) {
+  const [info, setInfo] = useState<{ key: string; data: RivalInfo } | null>(null);
+  const key = `${championKey}:${role}`;
+  useEffect(() => {
+    let cancelled = false;
+    fetch(`/api/en-vivo/rival?champ=${championKey}&rol=${role}`)
+      .then((res) => (res.ok ? (res.json() as Promise<RivalInfo>) : null))
+      .then((data) => !cancelled && data && setInfo({ key, data }))
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [championKey, role, key]);
+  const data = info?.key === key ? info.data : null;
+  if (!data || (!data.tips.length && !data.items.length)) return null;
+  return (
+    <section className="rounded-lg border border-loss/50 bg-surface p-3" aria-label="Tu rival de línea">
+      <h2 className="mb-2 flex items-center gap-2 font-display text-lg font-semibold">
+        <img src={img.champion(version, champ.id)} alt="" width={28} height={28} className="rounded-md ring-1 ring-loss/60" />
+        Tu rival de línea: {champ.name}
+      </h2>
+      <div className="grid gap-3 md:grid-cols-[minmax(0,1fr)_auto]">
+        {data.tips.length > 0 && (
+          <ul className="list-disc space-y-1 pl-4 text-sm text-muted">
+            {data.tips.map((t) => (
+              <li key={t}>{t}</li>
+            ))}
+          </ul>
+        )}
+        {data.items.length > 0 && (
+          <div>
+            <p className="mb-1 text-xs text-dim">Suele armar</p>
+            <ul className="flex gap-1.5">
+              {data.items.map((it) => (
+                <li key={it.id}>
+                  <img src={img.item(version, it.id)} alt={it.name} title={it.name} width={32} height={32} className="rounded" />
+                </li>
+              ))}
+            </ul>
+          </div>
+        )}
+      </div>
     </section>
   );
 }
@@ -214,6 +270,7 @@ function PlayerCard({
   spells,
   version,
   ally,
+  rival,
   platform,
 }: {
   p: LivePlayerInfo;
@@ -223,6 +280,8 @@ function PlayerCard({
   spells: Spells;
   version: string;
   ally: boolean;
+  /** Tu rival de línea: la tarjeta se marca. */
+  rival: boolean;
   platform: string;
 }) {
   const champ = champs[p.championId];
@@ -235,7 +294,7 @@ function PlayerCard({
   const premadeColor = p.premade && mates.length ? PREMADE_COLORS[(p.premade.group - 1) % PREMADE_COLORS.length] : null;
   return (
     <li
-      className={`flex flex-col overflow-hidden rounded-lg border bg-surface ${p.isMe ? "border-gold/70" : ally ? "border-hex/30" : "border-loss/30"}`}
+      className={`flex flex-col overflow-hidden rounded-lg border bg-surface ${p.isMe ? "border-gold/70" : rival ? "border-loss ring-1 ring-loss/60" : ally ? "border-hex/30" : "border-loss/30"}`}
       // Franja arriba con el color del grupo: los premades se reconocen sin leer.
       style={premadeColor ? { boxShadow: `inset 0 3px 0 ${premadeColor}` } : undefined}
     >
@@ -269,6 +328,9 @@ function PlayerCard({
         <p className="absolute bottom-1 left-2.5 font-display text-lg font-semibold drop-shadow-[0_1px_2px_rgba(0,0,0,0.9)]">
           {champ?.name}
         </p>
+        {rival && (
+          <span className="absolute right-1.5 bottom-1.5 rounded bg-loss/90 px-1.5 py-px text-[11px] font-semibold text-night">Tu rival</span>
+        )}
       </div>
 
       <div className="flex flex-1 flex-col text-xs">

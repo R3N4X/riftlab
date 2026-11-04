@@ -178,7 +178,7 @@ interface RawSession {
   localPlayerCellId: number;
   myTeam: RawPlayer[];
   theirTeam: RawPlayer[];
-  actions: { id: number; actorCellId: number; type: string; completed: boolean; championId: number }[][];
+  actions: { id: number; actorCellId: number; type: string; completed: boolean; isInProgress?: boolean; championId: number }[][];
   bans?: { myTeamBans: number[]; theirTeamBans: number[] };
   timer?: { phase?: string };
   queueId?: number;
@@ -664,16 +664,19 @@ export class LeagueClient {
    * él en el cliente): fijarlo sigue siendo decisión del jugador. Antes de tu turno queda como
    * intención, que tus aliados ven.
    */
-  async hoverChampion(championId: number): Promise<ActionResult> {
+  async hoverChampion(championId: number, kind: "pick" | "ban" = "pick"): Promise<ActionResult> {
     if (!this.creds) return { ok: false, message: "El cliente de League no está abierto." };
     const session = await request<RawSession>(this.creds, "GET", "/lol-champ-select/v1/session");
     if (session.status !== 200) return { ok: false, message: "Solo durante la selección de campeones." };
     const s = session.data;
-    const pick = s.actions.flat().find((a) => a.actorCellId === s.localPlayerCellId && a.type === "pick" && !a.completed);
-    if (!pick) return { ok: false, message: "Ya fijaste tu campeón." };
-    const res = await request(this.creds, "PATCH", `/lol-champ-select/v1/session/actions/${pick.id}`, { championId });
+    // Para bloquear tiene que ser tu turno; la elección se puede marcar antes (queda como intención).
+    const action = s.actions
+      .flat()
+      .find((a) => a.actorCellId === s.localPlayerCellId && a.type === kind && !a.completed && (kind === "pick" || a.isInProgress));
+    if (!action) return { ok: false, message: kind === "ban" ? "Todavía no es tu turno de bloquear." : "Ya fijaste tu campeón." };
+    const res = await request(this.creds, "PATCH", `/lol-champ-select/v1/session/actions/${action.id}`, { championId });
     return res.status >= 200 && res.status < 300
-      ? { ok: true, message: "Campeón seleccionado en el cliente (sin fijar)." }
+      ? { ok: true, message: kind === "ban" ? "Bloqueo marcado en el cliente (sin confirmar)." : "Campeón seleccionado en el cliente (sin fijar)." }
       : { ok: false, message: "El cliente no dejó seleccionar ese campeón." };
   }
 }

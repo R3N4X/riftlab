@@ -7,6 +7,7 @@ import {
   SCHEDULE_UPDATED,
   STAGES,
   TEAMS,
+  WORLDS_END,
   swissPools,
   swissStandings,
   teamLogo,
@@ -65,6 +66,8 @@ const REFRESH_MS = 2 * 60_000;
 export function WorldsSchedule({ matches, updated }: { matches: WorldsMatch[]; updated: string | null }) {
   const router = useRouter();
   useEffect(() => {
+    // Terminado el plazo de Worlds, la página ya no existe para el usuario: vuelve al inicio.
+    if (Date.now() >= WORLDS_END) router.replace("/");
     const t = setInterval(() => {
       if (document.visibilityState === "visible") router.refresh();
     }, REFRESH_MS);

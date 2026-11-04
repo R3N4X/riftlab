@@ -14,6 +14,8 @@ export interface RecommendedPick {
   name: string;
   winRate: number;
   reasons: { text: string; delta: number }[];
+  /** El puntaje se apoya en pocas partidas (del campeón en el rol o contra tu rival de línea). */
+  fewGames: string | null;
 }
 
 /** Desde cuántos puntos de maestría un campeón cuenta como "tuyo". */
@@ -78,12 +80,16 @@ export function Recommendations({
               scroll={false}
               onClick={() => void hover(p.key)}
               className="group block text-center"
-              title={`${p.name}: ${pct(p.winRate)} esperado${own ? `, ${Math.round(own / 1000)}k de maestría` : ""}${p.reasons.length ? `. ${p.reasons.map((r) => r.text).join("; ")}` : ""}`}
+              title={`${p.name}: ${pct(p.winRate)} esperado${own ? `, ${Math.round(own / 1000)}k de maestría` : ""}${p.reasons.length ? `. ${p.reasons.map((r) => r.text).join("; ")}` : ""}${p.fewGames ? `. ${p.fewGames}` : ""}`}
             >
-              <span className={`mx-auto block w-fit overflow-hidden rounded-md ${ring} group-hover:ring-gold/70`}>
+              <span className={`relative mx-auto block w-fit overflow-hidden rounded-md ${ring} group-hover:ring-gold/70`}>
                 <ChampIcon version={version} id={p.id} name={p.name} size={52} />
+                {p.fewGames && <FewGamesMark />}
               </span>
-              <span className={`mt-1 block font-display text-sm font-semibold ${scoreClass(score)}`}>{formatScore(score)}</span>
+              <span className={`mt-1 block font-display text-sm font-semibold ${scoreClass(score)} ${p.fewGames ? "opacity-70" : ""}`}>
+                {formatScore(score)}
+                {p.fewGames && <span className="text-dim">?</span>}
+              </span>
             </Link>
           </li>
         );
@@ -115,6 +121,12 @@ export function Recommendations({
           {result.message}
         </p>
       )}
+      {available.some((p) => p.fewGames) && (
+        <p className="text-[11px] text-dim">
+          <span className="text-gold-soft">?</span> Pocas partidas: el puntaje es menos confiable.
+        </p>
+      )}
+      {selected?.fewGames && <p className="text-xs text-gold-soft">{selected.fewGames}</p>}
       {selected && selected.reasons.length > 0 && (
         <p className="border-t border-line/60 pt-2 text-xs">
           <span className="text-ink">{selected.name}: </span>
@@ -124,6 +136,80 @@ export function Recommendations({
               {r.text}
             </span>
           ))}
+        </p>
+      )}
+    </div>
+  );
+}
+
+function FewGamesMark() {
+  return (
+    <span
+      className="absolute top-0.5 right-0.5 grid h-4 w-4 place-items-center rounded-full bg-night/90 font-display text-[11px] font-bold text-gold-soft ring-1 ring-gold/60"
+      aria-hidden="true"
+    >
+      ?
+    </span>
+  );
+}
+
+export interface BanPick {
+  key: string;
+  id: string;
+  name: string;
+  reason: string;
+}
+
+/**
+ * Bloqueos sugeridos para tu línea. Tocar uno lo marca en el cliente para bloquear, sin confirmar
+ * (solo en tu turno de bloquear): confirmarlo sigue siendo decisión del jugador.
+ */
+export function BanSuggestions({ bans, roleLabel, version }: { bans: BanPick[]; roleLabel: string; version: string }) {
+  const state = useLiveState();
+  const isDesktop = useIsDesktop();
+  const [result, setResult] = useState<ActionResult | null>(null);
+  const cs = state?.champSelect;
+  const canMark = Boolean(isDesktop && cs);
+
+  const mark = async (key: string) => {
+    if (!canMark) return;
+    try {
+      setResult(await window.riftlab!.hoverChampion(Number(key), "ban"));
+    } catch {
+      setResult({ ok: false, message: "No se pudo comunicar con el cliente de League." });
+    }
+  };
+
+  if (!bans.length) return <p className="text-sm text-muted">Sin datos suficientes para sugerir bloqueos de {roleLabel}.</p>;
+  return (
+    <div className="space-y-3">
+      <p className="text-xs text-dim">
+        Rivales de {roleLabel} que más les cuestan a tus campeones (o los más fuertes de la línea).{" "}
+        {canMark ? "Toca uno para marcarlo en el cliente sin confirmar el bloqueo." : ""}
+      </p>
+      <ul className="space-y-1.5">
+        {bans.map((b) => (
+          <li key={b.key}>
+            <button
+              type="button"
+              onClick={() => void mark(b.key)}
+              disabled={!canMark}
+              className="flex w-full items-center gap-3 rounded-md border border-line px-2 py-1.5 text-left enabled:hover:border-loss/60 disabled:cursor-default"
+            >
+              <span className="overflow-hidden rounded-md ring-1 ring-loss/50">
+                <ChampIcon version={version} id={b.id} name={b.name} size={36} />
+              </span>
+              <span className="min-w-0">
+                <span className="block font-medium">{b.name}</span>
+                <span className="block truncate text-xs text-muted">{b.reason}</span>
+              </span>
+            </button>
+          </li>
+        ))}
+      </ul>
+      {result && (
+        <p aria-live="polite" className={`text-xs ${result.ok ? "text-win" : "text-loss"}`}>
+          {result.message}
         </p>
       )}
     </div>

@@ -990,7 +990,7 @@ export async function getDraftInsights(
   });
 
   // Mismo cálculo que las recomendaciones (los cruces sin campeón no suman: son el promedio).
-  const fit = draftFit(ds, rank, self.key, self.role, myTeam.slice(1), theirTeam, (k) => champsByKey[k]?.name ?? k);
+  const fit = draftFit(ds, rank, self.key, self.role, myTeam.slice(1), theirTeam, champsByKey);
   const estimatedWinRate = fit.winRate;
 
   return { ...empty, laneOpponent, versus, synergy, encounters, baseWinRate: base, estimatedWinRate };
@@ -1012,7 +1012,14 @@ export interface DraftPick {
   winRate: number;
   /** Los dos efectos más fuertes (a favor o en contra), para explicar la recomendación. */
   reasons: DraftPickReason[];
+  /** Partidas del campeón en el rol y contra el rival de línea (null si todavía no eligió). */
+  games: number;
+  laneGames: number | null;
 }
+
+/** Bajo esto, el puntaje se apoya en pocas partidas y la página lo avisa. */
+export const FEW_ROLE_GAMES = 400;
+export const FEW_LANE_GAMES = 40;
 
 /**
  * Parte mínima del juego de un campeón que tiene que ser en el rol para recomendarlo ahí: deja
@@ -1045,8 +1052,9 @@ function draftFit(
   role: Role,
   myTeam: { key: string; role: Role }[],
   theirTeam: { key: string; role: Role }[],
-  name: (key: string) => string,
-): { winRate: number; reasons: DraftPickReason[] } {
+  champs: Record<string, ChampionSummary>,
+): { winRate: number; reasons: DraftPickReason[]; games: number; laneGames: number | null } {
+  const name = (k: string) => champs[k]?.name ?? k;
   const roleAgg = ds.champions[key]?.roles[role];
   const all = sumTiers(roleAgg?.byTier, "ALL");
   const base = all.games ? all.wins / all.games : 0.5;
@@ -1085,12 +1093,45 @@ function draftFit(
     effects.push({ text: d >= 0 ? `Buena pareja con ${name(a.key)}` : `No combina con ${name(a.key)}`, delta: d });
   }
 
+  for (const e of teamNeeds(champs[key], myTeam.map((a) => champs[a.key]).filter(Boolean))) {
+    total += e.delta;
+    effects.push(e);
+  }
+
   // El winrate del rol también se encoge: un campeón con pocas partidas no queda primero por suerte.
   const draft = Math.max(-MAX_DRAFT_EFFECT, Math.min(MAX_DRAFT_EFFECT, total));
+  const lane = theirTeam.find((e) => e.role === role);
   return {
     winRate: 0.5 + shrunkDelta(all, 0.5, 150) + draft,
     reasons: effects.filter((e) => Math.abs(e.delta) >= 0.005).sort((a, b) => Math.abs(b.delta) - Math.abs(a.delta)),
+    games: all.games,
+    laneGames: lane ? (roleAgg?.matchups[lane.key]?.games ?? 0) : null,
   };
+}
+
+/** Cuánto suma o resta lo que le falta al equipo (tipo de daño, primera línea). */
+const NEED_BONUS = 0.015;
+const NEED_PENALTY = 0.01;
+
+/**
+ * Lo que le falta a tu equipo, según el perfil de Data Dragon de los aliados ya elegidos (hacen
+ * falta al menos tres para sacar conclusiones): daño mágico o físico si casi todo es de un tipo
+ * (al rival le basta con una resistencia) y alguien que aguante si nadie es tanque.
+ */
+function teamNeeds(me: ChampionSummary | undefined, allies: ChampionSummary[]): DraftPickReason[] {
+  if (!me || allies.length < 3) return [];
+  const out: DraftPickReason[] = [];
+  const attack = allies.reduce((s, c) => s + c.info.attack, 0);
+  const magic = allies.reduce((s, c) => s + c.info.magic, 0);
+  const physical = attack + magic ? attack / (attack + magic) : 0.5;
+  const ap = me.info.magic > me.info.attack;
+  if (physical >= 0.7)
+    out.push(ap ? { text: "Aporta el daño mágico que le falta a tu equipo", delta: NEED_BONUS } : { text: "Tu equipo ya tiene mucho daño físico", delta: -NEED_PENALTY });
+  else if (physical <= 0.3)
+    out.push(!ap ? { text: "Aporta el daño físico que le falta a tu equipo", delta: NEED_BONUS } : { text: "Tu equipo ya tiene mucho daño mágico", delta: -NEED_PENALTY });
+  if (!allies.some((c) => c.tags.includes("Tank")) && me.tags.includes("Tank"))
+    out.push({ text: "Pone la primera línea que le falta a tu equipo", delta: NEED_BONUS });
+  return out;
 }
 
 /**
@@ -1116,8 +1157,6 @@ export async function getDraftPicks(
   const myTeam = assignRoles(ds, [{ key: "", role }, ...allies]).slice(1);
   const theirTeam = assignRoles(ds, enemies);
   const taken = new Set([...unavailable, ...allies.map((a) => a.key), ...enemies.map((e) => e.key)]);
-  const name = (key: string) => champsByKey[key]?.name ?? key;
-
   const roleShare = (key: string) => {
     const roles = ds.champions[key]?.roles ?? {};
     const total = ROLES.reduce((s, r) => s + sumTiers(roles[r]?.byTier, "ALL").games, 0);
@@ -1131,13 +1170,83 @@ export async function getDraftPicks(
   const candidates = eligible.filter((r, i) => i < 40 || own.has(r.champion.key));
 
   const picks = candidates.map((row): DraftPick => {
-    const fit = draftFit(ds, rank, row.champion.key, role, myTeam, theirTeam, name);
-    return { key: row.champion.key, role, tier: row, winRate: fit.winRate, reasons: fit.reasons.slice(0, 2) };
+    const fit = draftFit(ds, rank, row.champion.key, role, myTeam, theirTeam, champsByKey);
+    return {
+      key: row.champion.key,
+      role,
+      tier: row,
+      winRate: fit.winRate,
+      reasons: fit.reasons.slice(0, 2),
+      games: fit.games,
+      laneGames: fit.laneGames,
+    };
   });
 
   // Los mejores para el draft y, además, los del jugador (la página separa unos de otros).
   const sorted = picks.sort((a, b) => b.winRate - a.winRate);
   return sorted.filter((p, i) => i < limit || own.has(p.key));
+}
+
+/* ---------- Bloqueos sugeridos ---------- */
+
+export interface BanSuggestion {
+  key: string;
+  /** Qué tan molesto es para ti: más alto, más conviene bloquearlo. */
+  score: number;
+  reason: string;
+}
+
+/**
+ * Qué bloquear según tu línea: los rivales de tu línea que mejor les van contra los campeones que
+ * más juegas (los primeros de `pool` pesan más) y, si no hay datos tuyos, los más fuertes del meta
+ * en esa línea. Deja afuera a los ya bloqueados o elegidos.
+ */
+export async function getBanSuggestions(role: Role, pool: string[], unavailable: string[], rank: RankFilter, limit = 5): Promise<BanSuggestion[]> {
+  "use cache";
+  cacheLife("minutes");
+  const [ds, champsByKey] = await Promise.all([loadDataset(), getChampionsByKey()]);
+  // Solo campeones que de verdad se juegan en la línea (como en las recomendaciones).
+  const share = (key: string) => {
+    const roles = ds.champions[key]?.roles ?? {};
+    const total = ROLES.reduce((s, r) => s + sumTiers(roles[r]?.byTier, "ALL").games, 0);
+    return total ? sumTiers(roles[role]?.byTier, "ALL").games / total : 0;
+  };
+  const rows = computeRoleRows(ds, rank, champsByKey).filter((r) => r.role === role && share(r.champion.key) >= MIN_ROLE_SHARE);
+  const taken = new Set(unavailable);
+  const name = (k: string) => champsByKey[k]?.name ?? k;
+  // Tus campeones de esta línea (hasta 3, en orden de maestría) con suficientes partidas.
+  const mine = pool.filter((k) => rows.some((r) => r.champion.key === k)).slice(0, 3);
+
+  const out = rows
+    .filter((r) => !taken.has(r.champion.key) && !mine.includes(r.champion.key))
+    .map((r): BanSuggestion => {
+      // Winrate encogido: uno con pocas partidas y suerte no queda como "el más fuerte".
+      const wr = smoothedWr({ games: r.games, wins: r.winRate * r.games });
+      const meta = wr - 0.5 + 0.004 * Math.log(1 + r.pickRate * 100);
+      const strong = `De lo más fuerte de la línea (${(r.winRate * 100).toFixed(1)} %)`;
+      if (!mine.length) return { key: r.champion.key, score: meta, reason: strong };
+      // Cuánto pierden tus campeones contra él (encogido con pocas partidas), el primero pesa más.
+      let threat = 0;
+      let weight = 0;
+      const beaten: string[] = [];
+      mine.forEach((k, i) => {
+        const agg = ds.champions[k]?.roles[role];
+        const c = agg?.matchups[r.champion.key];
+        const all = sumTiers(agg?.byTier, "ALL");
+        const base = all.games ? all.wins / all.games : 0.5;
+        if (!c?.games) return;
+        const d = shrunkDelta(c, base, 60);
+        const w = 1 / (i + 1);
+        threat += -d * w;
+        weight += w;
+        if (d < -0.015) beaten.push(name(k));
+      });
+      const score = (weight ? threat / weight : 0) + meta / 2;
+      const reason = beaten.length ? `Le gana a ${beaten.join(" y ")}` : strong;
+      return { key: r.champion.key, score, reason };
+    })
+    .sort((a, b) => b.score - a.score);
+  return out.slice(0, limit);
 }
 
 /* ---------- Objeto de soporte ---------- */

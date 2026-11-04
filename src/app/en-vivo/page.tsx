@@ -22,7 +22,11 @@ import { parseRank, parseString } from "@/lib/params";
 import {
   getChampionStats,
   getDraftInsights,
+  FEW_LANE_GAMES,
+  FEW_ROLE_GAMES,
+  getBanSuggestions,
   getDraftPicks,
+  type BanSuggestion,
   type DraftInsights,
   type DraftPick,
   type DraftSlot,
@@ -32,7 +36,7 @@ import { counterReason } from "@/lib/stats/reasons";
 import { BuildPacks, ItemsAndSkills } from "./build-panels";
 import { GameView } from "./game-view";
 import { PanelTabs } from "./panel-tabs";
-import { Recommendations } from "./recommendations";
+import { BanSuggestions, Recommendations } from "./recommendations";
 
 export const metadata: Metadata = { title: "En vivo" };
 
@@ -59,6 +63,14 @@ function parseSlots(value: string | undefined): DraftSlot[] {
       return { key, role: isRole(role) ? role : null };
     })
     .filter((s) => /^\d+$/.test(s.key));
+}
+
+/** Aviso de pocos datos de un pick (null si el puntaje se apoya en partidas suficientes). */
+function fewGames(p: DraftPick): string | null {
+  if (p.games < FEW_ROLE_GAMES) return `Pocas partidas de este campeón en la línea (${p.games}): tómalo como referencia.`;
+  if (p.laneGames !== null && p.laneGames < FEW_LANE_GAMES)
+    return `Pocas partidas contra tu rival de línea (${p.laneGames}): el cruce pesa poco en el puntaje.`;
+  return null;
 }
 
 /** Hasta 40 keys de campeón ("103,222,...") para la lista de campeones propios. */
@@ -105,13 +117,18 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
   // Campeones con más maestría del jugador (los manda la app de escritorio).
   const pool = parseKeys40(parseString(sp, "mios"));
 
-  const [version, champs, draft, spells, picks] = await Promise.all([
+  // Sin nadie elegido todavía es la etapa de bloqueos: la pestaña de bloqueos va primero.
+  const banPhase = !myKey && !allies.length && !enemies.length;
+  const [version, champs, draft, spells, picks, bansSuggested] = await Promise.all([
     getLatestVersion(),
     getChampionsByKey(),
     getDraftInsights({ key: myKey, role: myRole }, allies, enemies, rank),
     getSummonerSpells(),
     // Con la línea conocida y sin fijar campeón se recomiendan picks (también al elegir primero).
     myRole && !locked && !inGame ? getDraftPicks(myRole, allies, enemies, unavailable, rank, PICK_COUNT, pool) : Promise.resolve([]),
+    myRole && !locked && !inGame
+      ? getBanSuggestions(myRole, pool, [...unavailable, ...allies.map((a) => a.key), ...enemies.map((e) => e.key)], rank)
+      : Promise.resolve([] as BanSuggestion[]),
   ]);
   const me = myKey ? champs[myKey] : undefined;
   // En vista previa: el que tocaste en la grilla o, sin campeón propio todavía, el mejor pick.
@@ -165,6 +182,8 @@ async function LiveContent({ searchParams }: { searchParams: PageProps<"/en-vivo
             locked={locked}
             draft={draft}
             picks={picks}
+            bans={bansSuggested}
+            banPhase={banPhase}
             champs={champs}
             version={version}
             slots={{ allies, enemies }}
@@ -291,6 +310,8 @@ async function Dashboard({
   locked,
   draft,
   picks,
+  bans,
+  banPhase,
   champs,
   version,
   slots,
@@ -307,6 +328,9 @@ async function Dashboard({
   locked: boolean;
   draft: DraftInsights;
   picks: DraftPick[];
+  bans: BanSuggestion[];
+  /** Nadie eligió todavía: los bloqueos van primero. */
+  banPhase: boolean;
   champs: Champs;
   version: string;
   slots: { allies: DraftSlot[]; enemies: DraftSlot[] };
@@ -331,7 +355,23 @@ async function Dashboard({
   const before = preview ? (me ? cardNumbers(me, draft, stats.role, champs) : null) : undefined;
   const opp = shownDraft.laneOpponent;
 
+  const banTab =
+    !locked && myRole
+      ? [
+          {
+            label: "Bloqueos",
+            panel: (
+              <BanSuggestions
+                bans={bans.flatMap((b) => (champs[b.key] ? [{ key: b.key, id: champs[b.key].id, name: champs[b.key].name, reason: b.reason }] : []))}
+                roleLabel={ROLE_LABEL[myRole].toLowerCase()}
+                version={version}
+              />
+            ),
+          },
+        ]
+      : [];
   const tabs = [
+    ...(banPhase ? banTab : []),
     ...(!locked && picks.length
       ? [
           {
@@ -339,7 +379,9 @@ async function Dashboard({
             panel: (
               <Recommendations
                 picks={picks.flatMap((p) =>
-                  champs[p.key] ? [{ key: p.key, id: champs[p.key].id, name: champs[p.key].name, winRate: p.winRate, reasons: p.reasons }] : [],
+                  champs[p.key]
+                    ? [{ key: p.key, id: champs[p.key].id, name: champs[p.key].name, winRate: p.winRate, reasons: p.reasons, fewGames: fewGames(p) }]
+                    : [],
                 )}
                 roleLabel={ROLE_LABEL[picks[0].role].toLowerCase()}
                 shownKey={shown.key}
@@ -363,6 +405,7 @@ async function Dashboard({
         </div>
       ),
     },
+    ...(banPhase ? [] : banTab),
   ];
 
   return (

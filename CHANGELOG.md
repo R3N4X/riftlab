@@ -2,6 +2,16 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.20 (04-11-2026)
+
+- Pestaña "Bloqueos" en la selección: sugiere qué bloquear según tu línea (los rivales que más les cuestan a los campeones que más juegas o, si no hay datos tuyos, los más fuertes de la línea). Al tocar uno queda marcado en el cliente, sin confirmar el bloqueo, cuando es tu turno.
+- Las recomendaciones tienen en cuenta lo que le falta a tu equipo: suben los campeones de daño mágico si casi todo es físico (y al revés) y los tanques si nadie aguanta daño.
+- Las recomendaciones con pocas partidas se marcan con "?" y avisan por qué el puntaje es menos confiable.
+- En la pantalla de carga se destaca a tu rival de línea, con consejos para jugarle y la build que suele armar.
+- Al terminar la partida se abre siempre tu resumen; ya no aparece la opción de elegir el de otro jugador.
+- La sección de Worlds queda una semana más después de la final y luego desaparece sola.
+- La descripción de la app en Windows ya no tiene caracteres dañados.
+
 ## 0.2.19 (04-11-2026)
 
 - La pantalla de carga marca a los premades de los dos equipos: una franja del mismo color arriba de sus tarjetas y "Dúo con X" (o trío, grupo de 4...). Se deduce de sus últimas partidas: con 2 o más juntos es premade; con una sola dice "Posible", porque puede ser casualidad.

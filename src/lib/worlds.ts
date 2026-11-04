@@ -63,8 +63,11 @@ export interface WorldsMatch {
   score?: [number, number];
 }
 
-/** Día después de la final: desde ahí el botón de la barra lateral ya no aparece. */
-export const WORLDS_END = Date.parse("2026-11-15T12:00:00Z");
+/**
+ * Una semana después de la final (14 de noviembre): desde ahí desaparece el botón de la barra
+ * lateral y la página manda al inicio. El código se puede borrar en la versión siguiente.
+ */
+export const WORLDS_END = Date.parse("2026-11-21T12:00:00Z");
 
 export const SCHEDULE_UPDATED = "30 de octubre";
 

@@ -12,7 +12,7 @@ import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, type Champ
 import { duration, kda } from "@/lib/format";
 import { getGameReview, type GameReview, type LaneReview, type ReviewEvent } from "@/lib/game-review";
 import { parseString } from "@/lib/params";
-import { RiotApiError, errorMessage, getMatch, getMatchIds, hasRiotKey, isRiotBusy, riotIdToSlug, type Match } from "@/lib/riot";
+import { RiotApiError, apiPuuid, errorMessage, getMatch, getMatchIds, hasRiotKey, isRiotBusy, riotIdToSlug, type Match } from "@/lib/riot";
 import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
 
@@ -64,36 +64,21 @@ async function ReviewContent({ params, searchParams }: Pick<PageProps<"/resumen/
   const [version, champsByKey, items, runes] = await Promise.all([getLatestVersion(), getChampionsByKey(), getItems(), getRuneIndex()]);
   // "yo" es un puuid o un Riot ID (Nombre#TAG): la app de escritorio manda el Riot ID, porque el
   // puuid del cliente de League no coincide con el de la API.
-  const yo = parseString(sp, "yo")?.toLowerCase();
-  const me = yo
-    ? match.info.participants.find((p) => p.puuid.toLowerCase() === yo || `${p.riotIdGameName}#${p.riotIdTagline}`.toLowerCase() === yo)
-    : undefined;
+  const yo = parseString(sp, "yo") ?? "";
+  // Los Riot ID se comparan sin mayúsculas ni espacios ("Ryna T1#Eli" = "rynat1#eli").
+  const norm = (s: string) => s.toLowerCase().replace(/\s+/g, "");
+  const find = (id: string) =>
+    match.info.participants.find((p) => norm(p.puuid) === norm(id) || norm(`${p.riotIdGameName}#${p.riotIdTagline}`) === norm(id));
+  // Si el Riot ID no coincide (por ejemplo, porque se cambió el nombre), se busca por su puuid de la API.
+  const me = yo ? (find(yo) ?? (yo.includes("#") ? find(await apiPuuid(platform, yo, "")) : undefined)) : undefined;
 
+  // El resumen es siempre el tuyo: no se ofrece ver el de los demás jugadores.
   if (!me) {
     return (
       <Wrap>
-        <Panel className="p-5">
-          <h1 className="font-display text-2xl font-semibold">¿De quién quieres ver el resumen?</h1>
-          <ul className="mt-4 grid gap-2 sm:grid-cols-2">
-            {match.info.participants.map((p) => {
-              const c = champsByKey[p.championId];
-              return (
-                <li key={p.puuid}>
-                  <Link
-                    href={`/resumen/${platform}/${matchId}?yo=${p.puuid}`}
-                    className="flex items-center gap-3 rounded-md border border-line px-3 py-2 hover:border-gold"
-                  >
-                    {c && <ChampIcon version={version} id={c.id} name={c.name} size={32} />}
-                    <span className="truncate">
-                      {p.riotIdGameName}
-                      <span className="text-dim">#{p.riotIdTagline}</span>
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
-          </ul>
-        </Panel>
+        <ErrorNote title="Tu cuenta no aparece en esta partida">
+          El resumen se arma con la cuenta con la que jugaste. Si cambiaste de cuenta en el cliente, abre la partida desde tu perfil.
+        </ErrorNote>
       </Wrap>
     );
   }

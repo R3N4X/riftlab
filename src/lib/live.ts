@@ -214,8 +214,8 @@ export interface DesktopBridge {
   setApiKey(key: string): Promise<ActionResult>;
   importRunes(page: RunePagePayload): Promise<ActionResult>;
   setSpells(spell1Id: number, spell2Id: number): Promise<ActionResult>;
-  /** Deja el campeón seleccionado (sin fijarlo) en la selección de campeones. */
-  hoverChampion(championId: number): Promise<ActionResult>;
+  /** Deja el campeón seleccionado (sin fijarlo) en la selección; con "ban", lo marca para bloquear sin confirmar. */
+  hoverChampion(championId: number, kind?: "pick" | "ban"): Promise<ActionResult>;
   /** Runas, hechizos (solo en la selección) y set de objetos de una vez. */
   importBuild(build: BuildPayload): Promise<ActionResult>;
   /** Guarda la comp en el Planificador de TFT del cliente y la deja como recordatorio en la partida. */

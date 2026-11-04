@@ -66,8 +66,20 @@ function MyProfileLink({ pathname, onNavigate }: { pathname: string | null; onNa
  * Solo aparece donde se llega desde otra página para mirar un detalle y volver (un perfil, una
  * partida, el resumen, comparar): no en las secciones de la barra lateral, ni en lo que se abre
  * desde la barra lateral (ahí se navega con la barra, no hacia atrás).
+ *
+ * La página de un campeón es un caso intermedio: abierta desde una lista (Campeones, Tier list...)
+ * no lo necesita, pero abierta desde otro detalle (de Aatrox a Jayce, desde En vivo o un perfil)
+ * sí, para volver a donde estabas.
  */
 const DETAIL_PAGES = /^\/(invocador|resumen|espectar|comparar)(\/|$)/;
+const CHAMPION_PAGE = /^\/campeones\/[^/]+/;
+/** Páginas desde las que se abre un detalle sin necesitar volver (listas y secciones). */
+const LIST_PAGES = new Set(["/", "/campeones", "/tier-list", "/sinergias", "/parche"]);
+
+function needsBack(path: string, previous: string | null): boolean {
+  if (DETAIL_PAGES.test(path)) return true;
+  return CHAMPION_PAGE.test(path) && previous !== null && !LIST_PAGES.has(previous);
+}
 
 /** Última página abierta desde la barra lateral. */
 let sidebarTarget: string | null = null;
@@ -106,7 +118,10 @@ function BackButton({ pathname, onNavigate }: { pathname: string | null; onNavig
     () => null,
   );
   const path = pathname ? decodeURIComponent(pathname) : null;
-  if (!canGoBack || !path || !DETAIL_PAGES.test(path) || path === fromSidebar) return null;
+  // Página anterior (se actualiza al cambiar de ruta, durante el render: patrón de estado derivado).
+  const [trail, setTrail] = useState<{ path: string | null; previous: string | null }>({ path, previous: null });
+  if (trail.path !== path) setTrail({ path, previous: trail.path });
+  if (!canGoBack || !path || path === fromSidebar || !needsBack(path, trail.previous)) return null;
   return (
     <button
       type="button"

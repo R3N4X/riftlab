@@ -9,6 +9,7 @@ Cada versión publicada, de la más nueva a la más vieja. El texto de cada vers
 - Las recomendaciones con pocas partidas se marcan con "?" y avisan por qué el puntaje es menos confiable.
 - En la pantalla de carga se destaca a tu rival de línea, con consejos para jugarle y la build que suele armar.
 - Al terminar la partida se abre siempre tu resumen; ya no aparece la opción de elegir el de otro jugador.
+- El botón "Volver" también aparece al pasar de un campeón a otro (por ejemplo, de Aatrox a uno de sus counters) o al abrir un campeón desde En vivo o un perfil. Desde la lista de campeones o la tier list sigue sin aparecer.
 - La sección de Worlds queda una semana más después de la final y luego desaparece sola.
 - La descripción de la app en Windows ya no tiene caracteres dañados.
 

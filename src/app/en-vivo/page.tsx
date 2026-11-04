@@ -19,6 +19,7 @@ import {
 import { SCORE_HINT, formatScore, goldScore, scoreClass, scoreOf } from "@/lib/draft-score";
 import { compact, pct } from "@/lib/format";
 import { parseRank, parseString } from "@/lib/params";
+import { row, tip, warn } from "@/lib/tip";
 import {
   getChampionStats,
   getDraftInsights,
@@ -586,7 +587,7 @@ function ScoreCard({
   return (
     <div className="space-y-3">
       <div className="grid grid-cols-2 gap-3">
-        <ScoreTile label="Puntuación global" hint={`Cómo te va en este draft: tu winrate más el efecto de cada campeón elegido. ${SCORE_HINT}`}>
+        <ScoreTile label="Puntuación global" hint={`Cómo te va en este draft: tu winrate más el efecto de cada campeón elegido.\n${SCORE_HINT}`}>
           <Compare before={prev("global")} after={after.global} render={(v) => <Score wr={v} />} />
           {after.global !== null && before === undefined && <span className="ml-2 text-sm font-normal text-muted">{pct(after.global)}</span>}
         </ScoreTile>
@@ -594,8 +595,8 @@ function ScoreCard({
           label="Fase de líneas"
           hint={
             after.laneBlind
-              ? `Rival de línea sin elegir: promedio contra todos los de tu línea. ${SCORE_HINT}`
-              : `Tu winrate contra el rival de tu línea. ${SCORE_HINT}`
+              ? `Rival de línea sin elegir: promedio contra todos los de tu línea.\n${SCORE_HINT}`
+              : `Tu winrate contra el rival de tu línea.\n${SCORE_HINT}`
           }
         >
           <Compare before={prev("lane")} after={after.lane} render={(v) => <Score wr={v} />} />
@@ -610,17 +611,17 @@ function ScoreCard({
         <Metric label="Winrate" hint="Winrate del campeón en tu línea, en todas las partidas.">
           <Compare before={prev("winRate")} after={after.winRate} render={(v) => <span className={scoreClass(scoreOf(v))}>{pct(v)}</span>} />
         </Metric>
-        <Metric label="Sinergia promedio" hint={`Promedio con tus aliados (los que no eligieron cuentan por su línea). ${SCORE_HINT}`}>
+        <Metric label="Sinergia promedio" hint={`Promedio con tus aliados (los que no eligieron cuentan por su línea).\n${SCORE_HINT}`}>
           <Compare before={prev("synergy")} after={after.synergy} render={(v) => <Score wr={v} />} />
         </Metric>
-        <Metric label="Counter promedio" hint={`Promedio contra los rivales (los que no eligieron cuentan por su línea). ${SCORE_HINT}`}>
+        <Metric label="Counter promedio" hint={`Promedio contra los rivales (los que no eligieron cuentan por su línea).\n${SCORE_HINT}`}>
           <Compare before={prev("counter")} after={after.counter} render={(v) => <Score wr={v} />} />
         </Metric>
       </dl>
 
       <div className="space-y-2.5 rounded-lg border border-line bg-surface p-3 text-sm">
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs text-muted" title="Parte del daño de tu equipo que es físico, según los campeones ya elegidos.">
+          <span className="text-xs text-muted" title={tip("Daño físico del equipo", "Parte del daño de tu equipo que es físico, según los campeones ya elegidos.")}>
             Daño físico del equipo
           </span>
           <Compare
@@ -640,7 +641,7 @@ function ScoreCard({
           </p>
         )}
         <div className="flex items-baseline justify-between gap-3">
-          <span className="text-xs text-muted" title={`Diferencia de oro al minuto 15 contra tu rival de línea. ${SCORE_HINT}`}>
+          <span className="text-xs text-muted" title={tip("Ventaja temprana", "Diferencia de oro al minuto 15 contra tu rival de línea.", SCORE_HINT)}>
             Ventaja temprana
           </span>
           <Compare
@@ -673,7 +674,7 @@ function ScoreCard({
 
 function ScoreTile({ label, hint, children }: { label: string; hint: string; children: React.ReactNode }) {
   return (
-    <div className="rounded-lg border border-gold/50 bg-gold/10 p-3" title={hint}>
+    <div className="rounded-lg border border-gold/50 bg-gold/10 p-3" title={tip(label, hint)}>
       <p className="text-xs text-gold-soft">{label}</p>
       <p className="mt-1 font-display text-3xl font-bold text-ink">{children}</p>
     </div>
@@ -682,7 +683,7 @@ function ScoreTile({ label, hint, children }: { label: string; hint: string; chi
 
 function Metric({ label, hint, children }: { label: string; hint?: string; children: React.ReactNode }) {
   return (
-    <div title={hint}>
+    <div title={hint && tip(label, hint)}>
       <dt className="text-xs text-muted">{label}</dt>
       <dd className="font-display text-xl font-semibold">{children}</dd>
     </div>
@@ -817,7 +818,7 @@ function CellValue({ cell, className = "" }: { cell: EncounterCell; className?: 
   if (cell.games === 0) return <span className={`text-dim ${className}`}>—</span>;
   const score = scoreOf(cell.winRate);
   return (
-    <span className={`leading-tight ${className}`} title={`${pct(cell.winRate)} en ${compact(cell.games)} partidas`}>
+    <span className={`leading-tight ${className}`} title={tip(`${formatScore(score)} de 5`, row("Winrate", pct(cell.winRate)), row("Partidas", compact(cell.games)), cell.blind && warn("Sin rival elegido: promedio contra todos los de esa línea."))}>
       <span className={`block font-display text-xl font-semibold ${scoreClass(score)}`}>
         {formatScore(score)}
         {cell.blind && <span className="text-loss">*</span>}

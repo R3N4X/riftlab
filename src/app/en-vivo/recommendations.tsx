@@ -7,6 +7,7 @@ import { useIsDesktop, useLiveState } from "@/components/live-client";
 import { formatScore, scoreClass, scoreOf } from "@/lib/draft-score";
 import { pct } from "@/lib/format";
 import type { ActionResult } from "@/lib/live";
+import { bullet, row, tip, warn } from "@/lib/tip";
 
 export interface RecommendedPick {
   key: string;
@@ -80,7 +81,14 @@ export function Recommendations({
               scroll={false}
               onClick={() => void hover(p.key)}
               className="group block text-center"
-              title={`${p.name}: ${pct(p.winRate)} esperado${own ? `, ${Math.round(own / 1000)}k de maestría` : ""}${p.reasons.length ? `. ${p.reasons.map((r) => r.text).join("; ")}` : ""}${p.fewGames ? `. ${p.fewGames}` : ""}`}
+              title={tip(
+                p.name,
+                row("Puntaje", `${formatScore(score)} de 5`),
+                row("Winrate esperado", pct(p.winRate)),
+                own > 0 && row("Tu maestría", `${Math.round(own / 1000)}k`),
+                ...p.reasons.map((r) => bullet(r.text)),
+                p.fewGames && warn(p.fewGames),
+              )}
             >
               <span className={`relative mx-auto block w-fit overflow-hidden rounded-md ${ring} group-hover:ring-gold/70`}>
                 <ChampIcon version={version} id={p.id} name={p.name} size={52} />

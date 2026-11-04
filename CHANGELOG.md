@@ -2,6 +2,13 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.22 (04-11-2026)
+
+- El set de objetos que se importa a la tienda vuelve a traer "Según la partida" (armadura, resistencia mágica o anticuración según los rivales) y "Situacionales". Con campeones de pocas partidas registradas, como Poppy soporte, esos bloques quedaban vacíos; ahora se completan con objetos típicos de su clase.
+- Hover nuevos en toda la app: un recuadro de ancho fijo con título, filas y viñetas en vez del globo de texto largo del sistema.
+- Al pasar el mouse por un objeto aparece su ficha: precio, estadísticas y efectos.
+- Las recomendaciones de En vivo muestran en el hover su puntaje, el winrate esperado, tu maestría, los motivos y el aviso de pocas partidas, cada uno por separado.
+
 ## 0.2.21 (04-11-2026)
 
 - Worlds: DK ya aparece en su cruce de cuartos contra BLG (Leaguepedia lo escribía con otras mayúsculas y quedaba "Por definir").

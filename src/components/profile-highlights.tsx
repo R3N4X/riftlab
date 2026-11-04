@@ -6,6 +6,7 @@
  */
 import { QUEUES, ROLE_LABEL, ROLES, type Role } from "@/lib/constants";
 import { kda } from "@/lib/format";
+import { row, tip } from "@/lib/tip";
 import { AXIS_FMT, AXIS_LABEL, AXIS_ORDER, AXIS_SHORT, gameAxes, ratioToScore, type AxisId } from "@/lib/performance";
 import type { ActiveGame, Match, MatchParticipant } from "@/lib/riot";
 import { ChampIcon } from "./icons";
@@ -339,7 +340,7 @@ export function RecentForm({ matches, puuid, data }: { matches: Match[]; puuid: 
         return (
           <li
             key={m.metadata.matchId}
-            title={`${p!.win ? "Victoria" : "Derrota"} con ${champ?.name ?? "campeón"} · ${p!.kills}/${p!.deaths}/${p!.assists} (${kda(p!.kills, p!.deaths, p!.assists)} KDA)`}
+            title={tip(p!.win ? "Victoria" : "Derrota", row("Campeón", champ?.name ?? "Otro"), row("K/D/A", `${p!.kills}/${p!.deaths}/${p!.assists}`), row("KDA", kda(p!.kills, p!.deaths, p!.assists)))}
             className={`h-2 w-3 rounded-sm ${p!.win ? "bg-win" : "bg-loss"}`}
           />
         );

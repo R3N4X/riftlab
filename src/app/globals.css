@@ -100,3 +100,36 @@ body {
   -webkit-app-region: drag;
   app-region: drag;
 }
+
+/* Tooltips propios (components/tooltip.tsx): flecha hacia el elemento y entrada corta. */
+.tip-bubble {
+  animation: tip-in 120ms ease-out;
+}
+
+.tip-arrow {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  margin-left: -4px;
+  background: #0c131d;
+  transform: rotate(45deg);
+}
+
+.tip-bubble[data-side="above"] .tip-arrow {
+  bottom: -5px;
+  border-right: 1px solid var(--color-line);
+  border-bottom: 1px solid var(--color-line);
+}
+
+.tip-bubble[data-side="below"] .tip-arrow {
+  top: -5px;
+  border-top: 1px solid var(--color-line);
+  border-left: 1px solid var(--color-line);
+}
+
+@keyframes tip-in {
+  from {
+    opacity: 0;
+    translate: 0 3px;
+  }
+}

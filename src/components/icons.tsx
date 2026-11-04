@@ -32,6 +32,8 @@ export function ItemIcon({ version, id, name, size = 28, className = "" }: Size 
       src={img.item(version, id)}
       alt={name ?? `Objeto ${id}`}
       title={name}
+      // La capa de tooltips muestra la ficha del objeto (precio, estadísticas y efectos).
+      data-item={String(id)}
       width={size}
       height={size}
       loading="lazy"

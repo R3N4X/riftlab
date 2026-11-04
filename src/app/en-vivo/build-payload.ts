@@ -83,16 +83,16 @@ const FALLBACK: Record<"armor" | "mr", Record<string, string[]>> = {
     Mage: ["3157"],
     Assassin: ["3026"],
     Marksman: ["3026"],
-    Fighter: ["3143", "6665"],
-    Tank: ["3075", "3143"],
+    Fighter: ["3143", "6665", "3742"],
+    Tank: ["3075", "3143", "3110", "6665"],
     Support: ["3190", "3050"],
   },
   mr: {
     Mage: ["3102"],
     Assassin: ["3156"],
     Marksman: ["3139"],
-    Fighter: ["3156", "3065"],
-    Tank: ["4401", "3065"],
+    Fighter: ["3156", "3065", "2504"],
+    Tank: ["4401", "3065", "2504", "8020"],
     Support: ["3222", "3190"],
   },
 };
@@ -150,14 +150,16 @@ function draftItems(me: ChampionSummary, draft: DraftProfile, stats: Stats, item
   const add = (ids: string[]) => {
     for (const id of ids) if (!exclude.has(id) && !picks.includes(id) && items[id]) picks.push(id);
   };
+  // Solo cuentan los que no están ya en la build: si el campeón ya arma todas sus resistencias
+  // (pasa con pocas partidas registradas), el bloque quedaba vacío en vez de usar el respaldo.
   const fromStats = (tag: string) =>
     stats.situational
       .map((s) => s.key)
-      .filter((id) => items[id]?.tags.includes(tag))
+      .filter((id) => !exclude.has(id) && items[id]?.tags.includes(tag))
       .slice(0, 2);
   const withFallback = (tag: string, kind: "armor" | "mr") => {
     const own = fromStats(tag);
-    return own.length ? own : (FALLBACK[kind][me.tags[0]] ?? []);
+    return own.length ? own : (FALLBACK[kind][me.tags[0]] ?? []).filter((id) => !exclude.has(id)).slice(0, 2);
   };
   if (draft.physical !== null && draft.physical >= 0.6) {
     reasons.push("mucho daño físico");
@@ -178,19 +180,22 @@ export function payloadFor(me: ChampionSummary, pack: Pack, stats: Stats, draft:
   const used = new Set(build);
   const vsDraft = draftItems(me, draft, stats, items, used);
   vsDraft.items.forEach((id) => used.add(id));
+  // Con pocas partidas registradas casi todo lo que arma el campeón ya está en la build; se completa
+  // con las resistencias típicas de su clase para que siempre haya alternativas.
+  const extra = stats.situational.map((s) => s.key).filter((id) => !used.has(id));
+  if (extra.length < 3) {
+    const cls = me.tags[0];
+    for (const id of [...(FALLBACK.armor[cls] ?? []), ...(FALLBACK.mr[cls] ?? []), antiHeal(me)]) {
+      if (!used.has(id) && !extra.includes(id) && items[id]) extra.push(id);
+    }
+  }
   const blocks = [
     { title: "Compra inicial", items: pack.starter?.key.split("-") ?? [] },
     // Soportes: a qué mejorar el objeto de soporte al completar la misión.
     { title: "Mejora del objeto de soporte", items: stats.supportItems.map((s) => s.key).slice(0, 2) },
     { title: "Build completa", items: build },
     { title: `Según la partida: ${vsDraft.reasons.join(" y ")}`, items: vsDraft.items },
-    {
-      title: "Situacionales",
-      items: stats.situational
-        .map((s) => s.key)
-        .filter((id) => !used.has(id))
-        .slice(0, 6),
-    },
+    { title: "Situacionales", items: extra.slice(0, 6) },
     { title: "Consumibles", items: [POTION, CONTROL_WARD, elixir(me)] },
   ].filter((b) => b.items.length > 0);
   const spells = pack.spell?.key.split("-").map(Number);

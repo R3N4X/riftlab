@@ -11,6 +11,7 @@ import { useEffect, useState } from "react";
 import { img } from "@/lib/assets";
 import { ROLE_LABEL, ROLES, TIER_LABEL, type Tier } from "@/lib/constants";
 import { compact } from "@/lib/format";
+import { row, tip } from "@/lib/tip";
 import type { LiveGameInfo, LivePlayerInfo } from "@/lib/live-players";
 import { RankCrest, RoleIcon } from "./icons";
 import { useLiveState } from "./live-client";
@@ -172,7 +173,7 @@ function LaneRival({ championKey, role, champ, version }: { championKey: string;
             <ul className="flex gap-1.5">
               {data.items.map((it) => (
                 <li key={it.id}>
-                  <img src={img.item(version, it.id)} alt={it.name} title={it.name} width={32} height={32} className="rounded" />
+                  <img src={img.item(version, it.id)} alt={it.name} title={it.name} data-item={it.id} width={32} height={32} className="rounded" />
                 </li>
               ))}
             </ul>
@@ -397,7 +398,7 @@ function PlayerCard({
                 <li
                   key={i}
                   className={`flex h-5 w-5 items-center justify-center rounded ${g.win ? "bg-win/25 ring-1 ring-win/60" : "bg-loss/25 ring-1 ring-loss/60"}`}
-                  title={`${g.win ? "Victoria" : "Derrota"} con ${champs[g.championId]?.name ?? "otro campeón"}${g.role ? ` (${ROLE_LABEL[g.role]})` : ""}, ${g.kills}/${g.deaths}/${g.assists}`}
+                  title={tip(g.win ? "Victoria" : "Derrota", row("Campeón", champs[g.championId]?.name ?? "Otro"), g.role && row("Línea", ROLE_LABEL[g.role]), row("KDA", `${g.kills}/${g.deaths}/${g.assists}`))}
                 >
                   {g.role ? (
                     <RoleIcon role={g.role} size={11} />

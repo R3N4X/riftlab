@@ -5,6 +5,7 @@ import { LiveWatcher } from "@/components/live-client";
 import { FirstRunSetup } from "@/components/first-run";
 import { FriendAlerts } from "@/components/friends";
 import { Nav, NavView } from "@/components/nav";
+import { TooltipLayer } from "@/components/tooltip";
 import { getChampionList, getLatestVersion, versionToPatch } from "@/lib/ddragon";
 import "./globals.css";
 
@@ -42,6 +43,7 @@ export default async function RootLayout({ children }: LayoutProps<"/">) {
         </Suspense>
         <FriendAlerts champions={champions} />
         <FirstRunSetup />
+        <TooltipLayer />
       </body>
     </html>
   );

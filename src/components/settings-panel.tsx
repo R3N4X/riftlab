@@ -313,7 +313,7 @@ function ChampSelectSection({ settings }: { settings: DesktopSettings }) {
       <div className="mb-5 border-b border-line pb-4">
         <Toggle
           label="Aceptar la partida sola"
-          hint="Acepta 3 segundos después de encontrar partida: en ese tiempo puedes rechazarla en el cliente o cancelar desde RiftLab. Si llevas más de 3 minutos sin usar el computador, no la acepta."
+          hint="Acepta 3 segundos después de encontrar partida: en ese tiempo puedes rechazarla en el cliente o cancelar desde RiftLab."
           checked={settings.autoAccept}
           onChange={(autoAccept) => void updateDesktopSettings({ autoAccept })}
         />

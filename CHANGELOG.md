@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.24 (05-11-2026)
+
+- "Aceptar la partida sola" acepta aunque lleves rato sin usar el computador (antes no aceptaba después de 3 minutos sin actividad). Sigues pudiendo rechazarla en el cliente o cancelar desde RiftLab en esos 3 segundos.
+
 ## 0.2.23 (05-11-2026)
 
 - Nueva opción en Ajustes → Selección de campeones: "Aceptar la partida sola". Viene apagada. Acepta 3 segundos después de encontrar partida, con un aviso y un botón "Cancelar"; si la rechazas en el cliente o llevas más de 3 minutos sin usar el computador, no la acepta.

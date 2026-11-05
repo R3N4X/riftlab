@@ -13,7 +13,7 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, watch, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
-import { BrowserWindow, Menu, app, globalShortcut, ipcMain, powerMonitor, screen, shell } from "electron";
+import { BrowserWindow, Menu, app, globalShortcut, ipcMain, screen, shell } from "electron";
 import { isPlatform } from "../src/lib/constants";
 import {
   profilePath,
@@ -538,20 +538,11 @@ const league = new LeagueClient((state) => {
 
 /** Margen antes de aceptar: alcanza para rechazarla en el cliente o cancelar desde RiftLab. */
 const ACCEPT_DELAY = 3000;
-/** Con más de 3 minutos sin tocar el computador no se acepta: entrarías a la selección sin estar. */
-const AWAY_SECONDS = 180;
 let acceptTimer: NodeJS.Timeout | null = null;
 
 function sendAccept(status: AutoAcceptStatus) {
   win?.webContents.send("accept:status", status);
 }
-
-const away = () => powerMonitor.getSystemIdleTime() >= AWAY_SECONDS;
-const awayStatus = (): AutoAcceptStatus => ({
-  state: "away",
-  message: "No se aceptó la partida: llevas más de 3 minutos sin usar el computador.",
-  at: Date.now(),
-});
 
 function handleReadyCheck(phase: string, previous: string) {
   if (phase !== "ReadyCheck") {
@@ -564,11 +555,9 @@ function handleReadyCheck(phase: string, previous: string) {
     return;
   }
   if (previous === "ReadyCheck" || acceptTimer || !currentSettings().autoAccept) return;
-  if (away()) return sendAccept(awayStatus());
   sendAccept({ state: "pending", acceptAt: Date.now() + ACCEPT_DELAY });
   acceptTimer = setTimeout(async () => {
     acceptTimer = null;
-    if (away()) return sendAccept(awayStatus());
     const r = await league.acceptReadyCheck().catch(() => ({ ok: false, message: "No se pudo comunicar con el cliente de League." }));
     sendAccept({ state: r.ok ? "accepted" : "failed", message: r.message, at: Date.now() });
   }, ACCEPT_DELAY);

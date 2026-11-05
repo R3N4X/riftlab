@@ -410,7 +410,7 @@ export function SetSpellsButton({ spellKey }: { spellKey: string }) {
 /* ---------- Aceptar la partida sola ---------- */
 
 /** Cuánto queda a la vista cada aviso que no es la cuenta regresiva. */
-const ACCEPT_NOTICE_MS = { accepted: 4000, cancelled: 5000, away: 10_000, failed: 6000 } as const;
+const ACCEPT_NOTICE_MS = { accepted: 4000, cancelled: 5000, failed: 6000 } as const;
 
 /**
  * Aviso de la aceptación automática (la decide el proceso principal de la app de escritorio): la cuenta

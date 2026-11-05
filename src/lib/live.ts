@@ -153,7 +153,7 @@ export interface DesktopSettings {
 export type AutoAcceptStatus =
   | { state: "none" }
   | { state: "pending"; acceptAt: number }
-  | { state: "accepted" | "cancelled" | "away" | "failed"; message: string; at: number };
+  | { state: "accepted" | "cancelled" | "failed"; message: string; at: number };
 
 export interface AutoImportParts {
   runes: boolean;

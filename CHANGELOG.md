@@ -2,6 +2,15 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.25 (05-11-2026)
+
+- Nuevo panel "Sesión de hoy" en el perfil, con las partidas desde las 5:00 de todas las colas:
+  - victorias, derrotas y winrate del día;
+  - LP ganados o perdidos y tu rango actual (en las clasificatorias jugadas con la app abierta);
+  - racha y tiempo jugado (desde las 3 horas se marca en dorado);
+  - nota del día comparada con lo habitual.
+- Cada partida del día aparece en orden con su campeón y resultado. Al pasar el mouse muestra el detalle y al tocarla abre su resumen.
+
 ## 0.2.24 (05-11-2026)
 
 - "Aceptar la partida sola" acepta aunque lleves rato sin usar el computador (antes no aceptaba después de 3 minutos sin actividad). Sigues pudiendo rechazarla en el cliente o cancelar desde RiftLab en esos 3 segundos.

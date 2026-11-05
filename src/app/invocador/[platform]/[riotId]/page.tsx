@@ -18,6 +18,8 @@ import { sortByLane } from "@/lib/lanes";
 import { getChampionRoleGames } from "@/lib/stats";
 import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
+import { SessionToday } from "@/components/session-today";
+import { dayStart, daySession } from "@/lib/session";
 import {
   RiotApiError,
   getAccountByRiotId,
@@ -113,7 +115,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
   }
 
   {
-    const { account, summoner, entries, masteries, matchIds, live, matches, data } = profile;
+    const { account, summoner, entries, masteries, matchIds, live, matches, session, data } = profile;
     const { version, champsByKey } = data;
     const solo = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
     const flex = entries.find((e) => e.queueType === "RANKED_FLEX_SR");
@@ -163,9 +165,10 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
           </div>
         </section>
 
-        {tilt && (
-          <div className="px-4 pt-6 sm:px-8">
-            <TiltBanner notice={tilt} />
+        {(session || tilt) && (
+          <div className="space-y-4 px-4 pt-6 sm:px-8">
+            {session && <SessionToday session={session} riotId={`${account.gameName}#${account.tagLine}`} data={data} />}
+            {tilt && <TiltBanner notice={tilt} />}
           </div>
         )}
 
@@ -372,11 +375,14 @@ function nameSize(name: string): string {
 async function loadProfile(platform: Platform, gameName: string, tagLine: string, count: number, queue?: number) {
   try {
     const account = await getAccountByRiotId(platform, gameName, tagLine);
-    const [summoner, entries, masteries, matchIds, live, version, champsByKey, items, spells, runes] = await Promise.all([
+    const now = Date.now();
+    const [summoner, entries, masteries, matchIds, todayIds, live, version, champsByKey, items, spells, runes] = await Promise.all([
       getSummonerByPuuid(platform, account.puuid),
       getLeagueEntries(platform, account.puuid),
       getTopMasteries(platform, account.puuid, 8),
       getMatchIds(platform, account.puuid, { count, queue }),
+      // La sesión de hoy cuenta todas las colas, aunque el historial esté filtrado.
+      getMatchIds(platform, account.puuid, { count: 30, startTime: dayStart(now) }).catch(() => [] as string[]),
       getActiveGame(platform, account.puuid).catch(() => null),
       getLatestVersion(),
       getChampionsByKey(),
@@ -384,8 +390,13 @@ async function loadProfile(platform: Platform, gameName: string, tagLine: string
       getSummonerSpells(),
       getRuneIndex(),
     ]);
-    const matches = (await Promise.all(matchIds.map((m) => getMatch(platform, m).catch(() => null)))).filter((m): m is Match => m !== null);
-    const data: MatchCardData = { version, champsByKey, items, spells, runes, platform, now: Date.now() };
+    const [matches, todayExtra] = await Promise.all(
+      [matchIds, todayIds.filter((id) => !matchIds.includes(id))].map(async (ids) =>
+        (await Promise.all(ids.map((m) => getMatch(platform, m).catch(() => null)))).filter((m): m is Match => m !== null),
+      ),
+    );
+    const data: MatchCardData = { version, champsByKey, items, spells, runes, platform, now };
+    const session = daySession([...matches, ...todayExtra], account.puuid, now);
     // Para las sugerencias del buscador: este jugador (con su rango) y los de sus partidas.
     const solo = entries.find((e) => e.queueType === "RANKED_SOLO_5x5");
     void rememberPlayers(platform, [
@@ -411,7 +422,7 @@ async function loadProfile(platform: Platform, gameName: string, tagLine: string
           })),
       ),
     ]);
-    return { ok: true as const, account, summoner, entries, masteries, matchIds, live, matches, data };
+    return { ok: true as const, account, summoner, entries, masteries, matchIds, live, matches, session, data };
   } catch (err) {
     return {
       ok: false as const,

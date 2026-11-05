@@ -27,7 +27,7 @@ interface Game {
 const average = (xs: number[]) => xs.reduce((s, x) => s + x, 0) / xs.length;
 
 /** Nota de 0 a 100 de una partida: el promedio de sus ejes (la misma del resumen post-partida). */
-function gameScore(m: Match, me: MatchParticipant): number | null {
+export function gameScore(m: Match, me: MatchParticipant): number | null {
   const axes = gameAxes(m, me);
   return axes.length ? Math.round(average(axes.map((a) => ratioToScore(a.ratio)))) : null;
 }

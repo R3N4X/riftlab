@@ -343,9 +343,11 @@ export async function getChampionMastery(platform: Platform, puuid: string, cham
   }
 }
 
-export async function getMatchIds(platform: Platform, puuid: string, opts: { count?: number; start?: number; queue?: number } = {}) {
+export async function getMatchIds(platform: Platform, puuid: string, opts: { count?: number; start?: number; queue?: number; startTime?: number } = {}) {
   const q = new URLSearchParams({ start: String(opts.start ?? 0), count: String(opts.count ?? 20) });
   if (opts.queue) q.set("queue", String(opts.queue));
+  // En segundos, como lo pide Riot.
+  if (opts.startTime) q.set("startTime", String(Math.floor(opts.startTime / 1000)));
   return riotFetch<string[]>(regionOf(platform), `/lol/match/v5/matches/by-puuid/${puuid}/ids?${q}`);
 }
 

@@ -13,11 +13,12 @@ import { spawn, type ChildProcess } from "node:child_process";
 import { appendFileSync, existsSync, readFileSync, readdirSync, renameSync, rmSync, watch, writeFileSync } from "node:fs";
 import { createServer } from "node:net";
 import { dirname, join } from "node:path";
-import { BrowserWindow, Menu, app, globalShortcut, ipcMain, screen, shell } from "electron";
+import { BrowserWindow, Menu, app, globalShortcut, ipcMain, powerMonitor, screen, shell } from "electron";
 import { isPlatform } from "../src/lib/constants";
 import {
   profilePath,
   type ActionResult,
+  type AutoAcceptStatus,
   type BuildPayload,
   type DesktopAccount,
   type AutoImportParts,
@@ -103,6 +104,7 @@ interface StoredSettings {
   flashKey?: "D" | "F";
   setupDone?: boolean;
   focusOnChampSelect?: boolean;
+  autoAccept?: boolean;
   /** Dirección de las actualizaciones automáticas (carpeta con latest.yml). */
   updateUrl?: string;
 }
@@ -142,6 +144,7 @@ function currentSettings(): DesktopSettings {
     flashKey: stored.flashKey === "D" || stored.flashKey === "F" ? stored.flashKey : null,
     setupDone: stored.setupDone ?? false,
     focusOnChampSelect: stored.focusOnChampSelect ?? true,
+    autoAccept: stored.autoAccept ?? false,
   };
 }
 
@@ -511,6 +514,7 @@ const league = new LeagueClient((state) => {
       if (!current.startsWith(appBase) || new URL(current).pathname !== "/en-vivo") void win.loadURL(`${appBase}/en-vivo`);
     }, 2000);
   }
+  handleReadyCheck(state.phase, lastPhase);
   lastPhase = state.phase;
 
   // La flotante se abre al empezar una partida de TFT y se cierra al terminar.
@@ -528,6 +532,53 @@ const league = new LeagueClient((state) => {
   // Primera vez que se detecta la cuenta: si seguías en el inicio, se abre tu perfil.
   if (firstTime && currentSettings().openOnProfile && win && appBase && new URL(win.webContents.getURL() || appBase).pathname === "/")
     void win.loadURL(`${appBase}${profilePath(next)}`);
+});
+
+/* ---------- Aceptar la partida sola ---------- */
+
+/** Margen antes de aceptar: alcanza para rechazarla en el cliente o cancelar desde RiftLab. */
+const ACCEPT_DELAY = 3000;
+/** Con más de 3 minutos sin tocar el computador no se acepta: entrarías a la selección sin estar. */
+const AWAY_SECONDS = 180;
+let acceptTimer: NodeJS.Timeout | null = null;
+
+function sendAccept(status: AutoAcceptStatus) {
+  win?.webContents.send("accept:status", status);
+}
+
+const away = () => powerMonitor.getSystemIdleTime() >= AWAY_SECONDS;
+const awayStatus = (): AutoAcceptStatus => ({
+  state: "away",
+  message: "No se aceptó la partida: llevas más de 3 minutos sin usar el computador.",
+  at: Date.now(),
+});
+
+function handleReadyCheck(phase: string, previous: string) {
+  if (phase !== "ReadyCheck") {
+    // La partida se aceptó en el cliente, alguien la rechazó o se canceló la búsqueda.
+    if (acceptTimer) {
+      clearTimeout(acceptTimer);
+      acceptTimer = null;
+      sendAccept({ state: "none" });
+    }
+    return;
+  }
+  if (previous === "ReadyCheck" || acceptTimer || !currentSettings().autoAccept) return;
+  if (away()) return sendAccept(awayStatus());
+  sendAccept({ state: "pending", acceptAt: Date.now() + ACCEPT_DELAY });
+  acceptTimer = setTimeout(async () => {
+    acceptTimer = null;
+    if (away()) return sendAccept(awayStatus());
+    const r = await league.acceptReadyCheck().catch(() => ({ ok: false, message: "No se pudo comunicar con el cliente de League." }));
+    sendAccept({ state: r.ok ? "accepted" : "failed", message: r.message, at: Date.now() });
+  }, ACCEPT_DELAY);
+}
+
+ipcMain.handle("accept:cancel", () => {
+  if (!acceptTimer) return;
+  clearTimeout(acceptTimer);
+  acceptTimer = null;
+  sendAccept({ state: "cancelled", message: "Esta partida no se aceptará sola. Acéptala o recházala en el cliente.", at: Date.now() });
 });
 
 /* ---------- LP por partida ---------- */
@@ -601,6 +652,7 @@ ipcMain.handle("settings:set", (_e, patch: SettingsPatch) => {
   else if (patch?.flashKey === null) delete next.flashKey;
   if (typeof patch?.setupDone === "boolean") next.setupDone = patch.setupDone;
   if (typeof patch?.focusOnChampSelect === "boolean") next.focusOnChampSelect = patch.focusOnChampSelect;
+  if (typeof patch?.autoAccept === "boolean") next.autoAccept = patch.autoAccept;
   writeSettings(next);
   return applySettings();
 });

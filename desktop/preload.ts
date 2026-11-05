@@ -4,6 +4,7 @@
  */
 import { contextBridge, ipcRenderer, type IpcRendererEvent } from "electron";
 import type {
+  AutoAcceptStatus,
   BuildPayload,
   DesktopAccount,
   DesktopBridge,
@@ -49,6 +50,12 @@ const bridge: DesktopBridge = {
     return () => ipcRenderer.removeListener("lp:changed", listener);
   },
   toggleTftOverlay: () => ipcRenderer.invoke("tft:overlay"),
+  onAutoAccept: (callback) => {
+    const listener = (_e: IpcRendererEvent, status: AutoAcceptStatus) => callback(status);
+    ipcRenderer.on("accept:status", listener);
+    return () => ipcRenderer.removeListener("accept:status", listener);
+  },
+  cancelAutoAccept: () => ipcRenderer.invoke("accept:cancel"),
   focusWindow: () => ipcRenderer.invoke("window:focus"),
   getUpdate: () => ipcRenderer.invoke("update:get"),
   onUpdate: (callback) => {

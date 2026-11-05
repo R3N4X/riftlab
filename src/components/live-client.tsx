@@ -13,6 +13,7 @@ import {
   draftToQuery,
   runeKeyToPage,
   type ActionResult,
+  type AutoAcceptStatus,
   type BuildPayload,
   type DesktopAccount,
   type DesktopSettings,
@@ -406,6 +407,66 @@ export function SetSpellsButton({ spellKey }: { spellKey: string }) {
   );
 }
 
+/* ---------- Aceptar la partida sola ---------- */
+
+/** Cuánto queda a la vista cada aviso que no es la cuenta regresiva. */
+const ACCEPT_NOTICE_MS = { accepted: 4000, cancelled: 5000, away: 10_000, failed: 6000 } as const;
+
+/**
+ * Aviso de la aceptación automática (la decide el proceso principal de la app de escritorio): la cuenta
+ * regresiva con "Cancelar" y, después, qué pasó.
+ */
+function AutoAcceptNotice() {
+  const [status, setStatus] = useState<AutoAcceptStatus>({ state: "none" });
+  const [now, setNow] = useState(() => Date.now());
+
+  useEffect(() => window.riftlab?.onAutoAccept(setStatus), []);
+
+  // La cuenta regresiva avanza sola; los demás avisos se esconden después de un rato.
+  useEffect(() => {
+    if (status.state === "none") return;
+    if (status.state === "pending") {
+      const id = setInterval(() => setNow(Date.now()), 250);
+      return () => clearInterval(id);
+    }
+    const id = setTimeout(() => setStatus({ state: "none" }), ACCEPT_NOTICE_MS[status.state]);
+    return () => clearTimeout(id);
+  }, [status]);
+
+  if (status.state === "none") return null;
+  const pending = status.state === "pending";
+  const seconds = pending ? Math.max(0, Math.ceil((status.acceptAt - now) / 1000)) : 0;
+  const tone = status.state === "accepted" || pending ? "border-gold/60" : status.state === "failed" ? "border-loss/60" : "border-line";
+  return (
+    <div
+      role="status"
+      aria-live="polite"
+      className={`fixed bottom-16 left-1/2 z-50 flex w-[min(92vw,26rem)] -translate-x-1/2 items-center gap-3 rounded-lg border bg-surface/95 px-4 py-3 text-sm shadow-xl backdrop-blur ${tone}`}
+    >
+      {pending ? (
+        <>
+          <span className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full border-2 border-gold font-display text-lg font-bold text-gold-soft tabular-nums">
+            {seconds}
+          </span>
+          <p className="min-w-0 flex-1 text-ink">
+            Partida encontrada
+            <span className="block text-xs text-muted">Se acepta sola en {seconds} s.</span>
+          </p>
+          <button
+            type="button"
+            onClick={() => void window.riftlab?.cancelAutoAccept()}
+            className="shrink-0 rounded-md border border-line px-3 py-1.5 text-sm text-ink hover:border-loss/70 hover:text-loss"
+          >
+            Cancelar
+          </button>
+        </>
+      ) : (
+        <p className={status.state === "accepted" ? "text-gold-soft" : status.state === "failed" ? "text-loss" : "text-muted"}>{status.message}</p>
+      )}
+    </div>
+  );
+}
+
 /* ---------- Observador global (layout) ---------- */
 
 /** En la app de escritorio, abre En vivo al entrar a la selección de campeones y muestra el estado. */
@@ -452,17 +513,20 @@ export function LiveWatcher() {
   }, [phase, tft, gameMode, pathname, router, lastGame, summoner]);
 
   if (!isDesktop || gameMode) return null;
-  if (pathname === "/en-vivo") return <AutoImporter />;
+  // Siempre en el mismo orden: así el aviso de la partida aceptada no se pierde al saltar a En vivo.
   return (
     <>
       <AutoImporter />
-      <Link
-        href="/en-vivo"
-        className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-full border border-line bg-surface/95 px-3 py-1.5 text-xs text-muted shadow-lg backdrop-blur hover:text-ink"
-      >
-        <span className={`h-2 w-2 rounded-full ${state?.connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
-        {state?.connected ? (PHASE_LABEL[state.phase] ?? "Cliente conectado") : "Cliente de League cerrado"}
-      </Link>
+      <AutoAcceptNotice />
+      {pathname !== "/en-vivo" && (
+        <Link
+          href="/en-vivo"
+          className="fixed right-4 bottom-4 z-40 flex items-center gap-2 rounded-full border border-line bg-surface/95 px-3 py-1.5 text-xs text-muted shadow-lg backdrop-blur hover:text-ink"
+        >
+          <span className={`h-2 w-2 rounded-full ${state?.connected ? "bg-win" : "bg-dim"}`} aria-hidden="true" />
+          {state?.connected ? (PHASE_LABEL[state.phase] ?? "Cliente conectado") : "Cliente de League cerrado"}
+        </Link>
+      )}
     </>
   );
 }

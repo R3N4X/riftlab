@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.23 (05-11-2026)
+
+- Nueva opción en Ajustes → Selección de campeones: "Aceptar la partida sola". Viene apagada. Acepta 3 segundos después de encontrar partida, con un aviso y un botón "Cancelar"; si la rechazas en el cliente o llevas más de 3 minutos sin usar el computador, no la acepta.
+
 ## 0.2.22 (04-11-2026)
 
 - El set de objetos que se importa a la tienda vuelve a traer "Según la partida" (armadura, resistencia mágica o anticuración según los rivales) y "Situacionales". Con campeones de pocas partidas registradas, como Poppy soporte, esos bloques quedaban vacíos; ahora se completan con objetos típicos de su clase.

@@ -409,8 +409,10 @@ export class LeagueClient {
   start() {
     const tick = async () => {
       await this.poll().catch(() => this.disconnect());
-      // Más seguido durante la selección de campeones, más espaciado sin cliente.
-      const delay = !this.state.connected ? 4000 : this.state.phase === "ChampSelect" ? 1000 : 2000;
+      // Más seguido durante la búsqueda y la selección (la partida encontrada dura pocos segundos),
+      // más espaciado sin cliente.
+      const fast = new Set(["Matchmaking", "ReadyCheck", "ChampSelect"]);
+      const delay = !this.state.connected ? 4000 : fast.has(this.state.phase) ? 1000 : 2000;
       this.timer = setTimeout(tick, delay);
     };
     void tick();
@@ -678,5 +680,18 @@ export class LeagueClient {
     return res.status >= 200 && res.status < 300
       ? { ok: true, message: kind === "ban" ? "Bloqueo marcado en el cliente (sin confirmar)." : "Campeón seleccionado en el cliente (sin fijar)." }
       : { ok: false, message: "El cliente no dejó seleccionar ese campeón." };
+  }
+
+  /** Acepta la partida encontrada, salvo que ya la hayas aceptado o rechazado tú en el cliente. */
+  async acceptReadyCheck(): Promise<ActionResult> {
+    if (!this.creds) return { ok: false, message: "El cliente de League no está abierto." };
+    const check = await request<{ state?: string; playerResponse?: string }>(this.creds, "GET", "/lol-matchmaking/v1/ready-check");
+    if (check.status !== 200 || check.data?.state !== "InProgress") return { ok: false, message: "La partida ya no estaba esperando respuesta." };
+    if (check.data.playerResponse === "Declined") return { ok: false, message: "La rechazaste en el cliente: no se aceptó." };
+    if (check.data.playerResponse === "Accepted") return { ok: true, message: "Ya la habías aceptado en el cliente." };
+    const res = await request(this.creds, "POST", "/lol-matchmaking/v1/ready-check/accept");
+    return res.status >= 200 && res.status < 300
+      ? { ok: true, message: "Partida aceptada." }
+      : { ok: false, message: "El cliente no dejó aceptar la partida." };
   }
 }

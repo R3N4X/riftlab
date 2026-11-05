@@ -308,8 +308,17 @@ function ChampSelectSection({ settings }: { settings: DesktopSettings }) {
   return (
     <SettingsCard
       title="Selección de campeones"
-      description="Cómo pone RiftLab tus hechizos y qué importa sola cuando bloqueas el campeón."
+      description="Cómo pone RiftLab tus hechizos, qué importa sola cuando bloqueas el campeón y si acepta la partida por ti."
     >
+      <div className="mb-5 border-b border-line pb-4">
+        <Toggle
+          label="Aceptar la partida sola"
+          hint="Acepta 3 segundos después de encontrar partida: en ese tiempo puedes rechazarla en el cliente o cancelar desde RiftLab. Si llevas más de 3 minutos sin usar el computador, no la acepta."
+          checked={settings.autoAccept}
+          onChange={(autoAccept) => void updateDesktopSettings({ autoAccept })}
+        />
+      </div>
+
       <p className="mb-2 text-sm text-muted">Tecla de Destello</p>
       <ChoiceGroup
         name="ajustes-destello"

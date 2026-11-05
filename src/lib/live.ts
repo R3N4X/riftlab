@@ -145,7 +145,15 @@ export interface DesktopSettings {
   setupDone: boolean;
   /** Traer la ventana al frente (en En vivo) al entrar a la selección de campeones. */
   focusOnChampSelect: boolean;
+  /** Aceptar sola la partida encontrada (unos segundos después, si no estás ausente). Apagado salvo que lo active. */
+  autoAccept: boolean;
 }
+
+/** Qué pasó con la aceptación automática de la última partida encontrada. */
+export type AutoAcceptStatus =
+  | { state: "none" }
+  | { state: "pending"; acceptAt: number }
+  | { state: "accepted" | "cancelled" | "away" | "failed"; message: string; at: number };
 
 export interface AutoImportParts {
   runes: boolean;
@@ -166,6 +174,7 @@ export type SettingsPatch = Partial<
     | "flashKey"
     | "setupDone"
     | "focusOnChampSelect"
+    | "autoAccept"
   >
 >;
 
@@ -227,6 +236,10 @@ export interface DesktopBridge {
   setUpdateUrl(url: string): Promise<UpdateStatus>;
   /** Cierra la app e instala la actualización ya descargada. */
   installUpdate(): Promise<void>;
+  /** Avisa cuando se va a aceptar (o se aceptó) sola una partida encontrada. */
+  onAutoAccept(callback: (status: AutoAcceptStatus) => void): () => void;
+  /** No acepta la partida encontrada que está por aceptarse sola. */
+  cancelAutoAccept(): Promise<void>;
   /** Trae la ventana principal al frente (al hacer clic en un aviso). */
   focusWindow(): Promise<void>;
   /** LP ganados o perdidos por partida clasificatoria, por id de partida. */

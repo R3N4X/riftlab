@@ -11,7 +11,7 @@ import { useEffect, useState } from "react";
 import { img } from "@/lib/assets";
 import { ROLE_LABEL, ROLES, TIER_LABEL, type Tier } from "@/lib/constants";
 import { compact } from "@/lib/format";
-import { row, tip } from "@/lib/tip";
+import { tip, row, warn } from "@/lib/tip";
 import type { LiveGameInfo, LivePlayerInfo } from "@/lib/live-players";
 import { RankCrest, RoleIcon } from "./icons";
 import { useLiveState } from "./live-client";
@@ -251,7 +251,7 @@ function PremadeBadge({ group, games, mates }: { group: number; games: number; m
     <p
       className="mx-2.5 mb-2 flex items-center gap-1.5 rounded-md border px-1.5 py-1 text-[11px] leading-tight"
       style={{ borderColor: `${color}80`, color, backgroundColor: `${color}14` }}
-      title={`Jugaron juntos en ${games} de sus últimas partidas${sure ? "" : ": puede ser casualidad"}.`}
+      title={tip(sure ? "Premade" : "Posible premade", row("Partidas juntos", games), !sure && warn("Con una sola partida juntos puede ser casualidad."))}
     >
       <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2.2" strokeLinecap="round" aria-hidden="true">
         <path d="M10 13a5 5 0 0 0 7.5.5l3-3a5 5 0 0 0-7-7l-1.7 1.7" />
@@ -321,7 +321,7 @@ function PlayerCard({
         {p.role && (
           <span
             className="absolute top-1.5 right-1.5 flex h-6 w-6 items-center justify-center rounded-md bg-night/80 ring-1 ring-line"
-            title={`Línea en esta partida: ${ROLE_LABEL[p.role]}`}
+            title={tip("Línea en esta partida", ROLE_LABEL[p.role])}
           >
             <RoleIcon role={p.role} size={14} />
           </span>
@@ -369,7 +369,7 @@ function PlayerCard({
         <dl className="grid grid-cols-2 gap-x-2 border-t border-line/60 px-2.5 py-2">
           <div className="min-w-0">
             <dt className="text-[11px] text-dim">Suele jugar</dt>
-            <dd className="flex items-center gap-1 truncate text-ink" title={main ? `${Math.round(main.share * 100)} % de su juego` : undefined}>
+            <dd className="flex items-center gap-1 truncate text-ink" title={main ? tip("Suele jugar", row("Parte de sus partidas", `${Math.round(main.share * 100)} %`)) : undefined}>
               {main ? (
                 <>
                   <RoleIcon role={main.role} size={13} />

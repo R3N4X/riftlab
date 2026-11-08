@@ -37,6 +37,7 @@ import {
   type LeagueEntry,
   type Match,
 } from "@/lib/riot";
+import { tip, row } from "@/lib/tip";
 
 export async function generateMetadata({ params }: PageProps<"/invocador/[platform]/[riotId]">): Promise<Metadata> {
   const { riotId } = await params;
@@ -220,7 +221,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
                           <ChampIcon version={version} id={champ.id} name={champ.name} size={48} />
                         </Link>
                         {/* Emblema de maestría montado sobre el borde del ícono, con el nivel encima, como en el cliente. */}
-                        <div className="relative -mt-3 flex flex-col items-center" title={`Maestría nivel ${m.championLevel}`}>
+                        <div className="relative -mt-3 flex flex-col items-center" title={tip(`Maestría nivel ${m.championLevel}`, row("Puntos", m.championPoints.toLocaleString("es-CL")))}>
                           <span className="relative z-10 rounded bg-night/90 px-1 text-[11px] leading-tight font-semibold text-ink">
                             {m.championLevel}
                           </span>
@@ -309,7 +310,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
                       const n = recent.roles[r] ?? 0;
                       const h = recent.games ? Math.max(4, (n / recent.games) * 64) : 4;
                       return (
-                        <li key={r} className="flex flex-col items-center gap-1" title={`${ROLE_LABEL[r]}: ${n}`}>
+                        <li key={r} className="flex flex-col items-center gap-1" title={tip(ROLE_LABEL[r], row("Partidas", `${n} de ${recent.games}`))}>
                           <span className="w-4 rounded-sm bg-hex/70" style={{ height: h }} />
                           <RoleIcon role={r} size={16} className={n ? "" : "opacity-30"} />
                         </li>

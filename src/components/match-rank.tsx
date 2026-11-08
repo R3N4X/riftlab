@@ -4,6 +4,7 @@ import { useEffect, useRef, useState } from "react";
 import { TIER_LABEL } from "@/lib/constants";
 import type { MatchRanks, PlayerRank as Rank } from "@/lib/match-rank";
 import { RankCrest } from "./icons";
+import { tip, row } from "@/lib/tip";
 
 /*
  * Los rangos de una partida cuestan hasta 10 consultas a Riot: se piden recién
@@ -74,7 +75,7 @@ export function MatchRank({ platform, matchId }: { platform: string; matchId: st
       {ranks === undefined ? (
         <div className="h-10 w-24 animate-pulse rounded bg-raised/60" aria-label="Cargando el rango promedio" />
       ) : average ? (
-        <div className="flex items-center gap-2" title={`Promedio de ${average.ranked} de ${average.players} jugadores con rango`}>
+        <div className="flex items-center gap-2" title={tip("Rango promedio", row("Jugadores con rango", `${average.ranked} de ${average.players}`))}>
           <RankCrest tier={average.tier} size={32} />
           <div className="leading-tight">
             <p className="text-sm font-semibold whitespace-nowrap">
@@ -97,7 +98,7 @@ export function PlayerRank({ platform, matchId, puuid, fallback }: { platform: s
   const rank = ranks.players[puuid];
   if (!rank) return <span className="block truncate text-xs text-dim">Sin clasificar</span>;
   return (
-    <span className="flex min-w-0 items-center gap-1 text-xs text-muted" title={`${rankLabel(rank)}, ${rank.leaguePoints} LP`}>
+    <span className="flex min-w-0 items-center gap-1 text-xs text-muted" title={tip(rankLabel(rank), row("LP", rank.leaguePoints))}>
       <RankCrest tier={rank.tier} size={14} />
       <span className="truncate">{rankLabel(rank)}</span>
     </span>

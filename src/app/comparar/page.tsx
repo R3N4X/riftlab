@@ -3,7 +3,7 @@ import Link from "next/link";
 import { connection } from "next/server";
 import { Suspense } from "react";
 import { ChampIcon, RankCrest, RoleIcon } from "@/components/icons";
-import { profileStyle, scoreClass, type Axis } from "@/components/profile-highlights";
+import { HitBox, profileStyle, scoreClass, type Axis } from "@/components/profile-highlights";
 import { SummonerSearch } from "@/components/summoner-search";
 import { ErrorNote, Panel, Skeleton } from "@/components/ui";
 import { PLATFORMS, ROLE_LABEL, TIER_LABEL, isPlatform, type Platform, type Tier } from "@/lib/constants";
@@ -11,6 +11,7 @@ import { headToHead, loadComparedPlayer, type ComparedPlayer } from "@/lib/compa
 import { getChampionsByKey, getLatestVersion, img, type ChampionSummary } from "@/lib/ddragon";
 import { kda } from "@/lib/format";
 import { parseString } from "@/lib/params";
+import { row, tip } from "@/lib/tip";
 import { RiotApiError, errorMessage, hasRiotKey, riotIdToSlug, slugToRiotId } from "@/lib/riot";
 
 export const metadata: Metadata = { title: "Comparar jugadores" };
@@ -340,8 +341,12 @@ function CompareRadar({ a, b, nameA, nameB }: { a: Axis[]; b: Axis[]; nameA: str
           const [lx, ly] = point(i, 1.22);
           const anchor = Math.abs(lx - cx) < 4 ? "middle" : lx > cx ? "start" : "end";
           return (
-            <g key={x.id}>
-              <title>{`${x.label}: ${nameA} ${x.score ?? "—"}, ${nameB} ${b[i].score ?? "—"}`}</title>
+            <g
+              key={x.id}
+              className="cursor-help"
+              data-tip={tip(x.label, row(nameA, x.score ?? "—"), row(nameB, b[i].score ?? "—"), "50 es lo normal en su rol.")}
+            >
+              <HitBox x={lx} y={ly} anchor={anchor} width={120} />
               <text x={lx} y={ly + 4} textAnchor={anchor} className="text-[11px]">
                 <tspan className="fill-muted">{x.label} </tspan>
                 <tspan className={`font-semibold ${scoreClass(x.score).replace("fill-ink", "fill-gold-soft")}`}>{x.score ?? "—"}</tspan>

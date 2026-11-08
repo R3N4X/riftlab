@@ -8,10 +8,9 @@
 import { DEFAULT_RANK, ROLE_LABEL, type Platform, type Role } from "./constants";
 import { getItems, type Item } from "./ddragon";
 import {
-  AXIS_FMT,
+  axisTip,
   AXIS_LABEL,
   AXIS_ORDER,
-  AXIS_SHORT,
   CONTROL_WARDS_BENCH,
   CS_BENCH,
   benchRole,
@@ -116,13 +115,13 @@ export async function getGameReview(platform: Platform, match: Match, puuid: str
   const samples = new Map(gameAxes(match, me).map((x) => [x.id, x]));
   const axes: ReviewAxis[] = AXIS_ORDER.map((id) => {
     const x = samples.get(id);
-    if (!x) return { id, label: AXIS_LABEL[id], score: null, why: `${AXIS_LABEL[id]}: no aplica en esta partida` };
+    if (!x) return { id, label: AXIS_LABEL[id], score: null, why: axisTip(id, null) };
     const score = ratioToScore(x.ratio);
     return {
       id,
       label: AXIS_LABEL[id],
       score,
-      why: `${AXIS_LABEL[id]} ${score}: ${AXIS_FMT[id](x.value)}; lo normal en el rol es ${AXIS_SHORT[id](x.bench)}`,
+      why: axisTip(id, score, x.value, x.bench),
     };
   });
   const scored = axes.filter((a): a is ReviewAxis & { score: number } => a.score !== null);

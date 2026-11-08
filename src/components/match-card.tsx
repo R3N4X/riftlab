@@ -11,6 +11,7 @@ import { MatchLp } from "./match-lp";
 import { MatchRank, PlayerRank } from "./match-rank";
 import { MatchTimeline } from "./match-timeline";
 import { ChampIcon, ItemIcon, RuneIcon, SpellIcon } from "./icons";
+import { tip, row } from "@/lib/tip";
 
 const RANKED_QUEUES = new Set([420, 440]);
 
@@ -257,11 +258,11 @@ function MatchDetails({
                 <thead>
                   <tr className="text-left text-xs text-dim">
                     <th className="py-1 pr-2 font-medium">Jugador</th>
-                    <th className="px-1.5 py-1 text-center font-medium" title="Puntuación RiftLab de 0 a 10 comparando a los 10 jugadores">
+                    <th className="px-1.5 py-1 text-center font-medium" title={tip("Puntuación RiftLab", "De 0 a 10, comparando a los 10 jugadores de la partida.")}>
                       Nota
                     </th>
                     <th className="px-1.5 py-1 font-medium">KDA</th>
-                    <th className="px-1.5 py-1 font-medium" title="Barra roja: daño a campeones. Barra gris: daño recibido">
+                    <th className="px-1.5 py-1 font-medium" title={tip("Daño", row("Barra roja", "Daño a campeones"), row("Barra gris", "Daño recibido"))}>
                       Daño
                     </th>
                     <th className="px-1.5 py-1 text-right font-medium">Oro y CS</th>
@@ -407,7 +408,7 @@ function PlayerRow({
           {cs} CS ({(cs / minutes).toFixed(1)})
         </span>
       </td>
-      <td className="px-1.5 py-1.5 text-right text-muted" title={`${p.wardsPlaced} guardianes puestos, ${p.wardsKilled} destruidos`}>
+      <td className="px-1.5 py-1.5 text-right text-muted" title={tip("Guardianes", row("Puestos", p.wardsPlaced), row("Destruidos", p.wardsKilled))}>
         {p.visionScore}
         <span className="block text-xs text-dim">
           {p.wardsPlaced}/{p.wardsKilled}
@@ -520,7 +521,7 @@ function ScoreBadge({ score, compact: small = false }: { score: PlayerScore; com
   return (
     <span
       className={`inline-flex items-center gap-1 rounded px-1.5 text-xs font-semibold whitespace-nowrap ${style}`}
-      title={`Puesto ${score.rank} de 10`}
+      title={tip("Puntuación RiftLab", row("Puesto", `${score.rank} de 10`))}
     >
       {score.score.toFixed(1)}
       {score.badge ? <span>{score.badge}</span> : !small && <span className="font-normal">{score.rank}.º</span>}

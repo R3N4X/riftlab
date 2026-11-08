@@ -19,7 +19,7 @@ import {
 import { SCORE_HINT, formatScore, goldScore, scoreClass, scoreOf } from "@/lib/draft-score";
 import { compact, pct } from "@/lib/format";
 import { parseRank, parseString } from "@/lib/params";
-import { row, tip, warn } from "@/lib/tip";
+import { tip, row, warn } from "@/lib/tip";
 import {
   getChampionStats,
   getDraftInsights,
@@ -799,13 +799,13 @@ function Pair({
         {other ? (
           <ChampIcon version={version} id={other.id} name={other.name} size={40} className="rounded-full" />
         ) : (
-          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-raised" title={`Sin elegir (${ROLE_LABEL[role]})`}>
+          <span className="flex h-10 w-10 items-center justify-center rounded-full bg-raised" title={tip("Sin elegir", row("Línea", ROLE_LABEL[role]))}>
             <RoleIcon role={role} size={18} className="opacity-50" />
           </span>
         )}
         <span
           className="absolute -right-1 -bottom-1 rounded-full bg-surface p-0.5"
-          title={`${ROLE_LABEL[role]}${cell.guessed ? " (estimado)" : ""}`}
+          title={tip(ROLE_LABEL[role], cell.guessed && "Línea estimada según el campeón.")}
         >
           <RoleIcon role={role} size={12} className={cell.guessed ? "opacity-50" : ""} />
         </span>

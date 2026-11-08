@@ -2,6 +2,7 @@
 
 import { useEffect, useId, useMemo, useRef, useState } from "react";
 import { compact } from "@/lib/format";
+import { row, tip } from "@/lib/tip";
 import type { ObjectiveType, TimelineObjective, TimelineSummary } from "@/lib/timeline";
 import { SkillOrder } from "./build";
 import { ItemIcon } from "./icons";
@@ -191,6 +192,16 @@ function GoldChart({
   const last = series[series.length - 1];
   const ticks = series.map((_, i) => i).filter((i) => i % 5 === 0);
   const markerY = H - 12;
+  // Objetivos seguidos se corren a la derecha lo justo para no taparse entre sí.
+  const markerX: number[] = [];
+  for (const [i, o] of objectives.entries()) {
+    const want = x(Math.min(o.minute, series.length - 1));
+    markerX.push(i ? Math.max(want, markerX[i - 1] + 15) : want);
+  }
+  // Y si al final se salen del gráfico, se corren hacia la izquierda.
+  for (let i = markerX.length - 1; i >= 0; i--) {
+    markerX[i] = Math.min(markerX[i], i === markerX.length - 1 ? width - 9 : markerX[i + 1] - 15);
+  }
 
   function onMove(e: React.PointerEvent<SVGRectElement>) {
     const rect = e.currentTarget.getBoundingClientRect();
@@ -255,10 +266,11 @@ function GoldChart({
         {objectives.map((o, i) => {
           const mine = o.teamId === myTeam;
           const label = OBJECTIVE_LABEL[o.type];
-          const cx = x(Math.min(o.minute, series.length - 1));
+          const cx = markerX[i];
           return (
-            <g key={i}>
-              <title>{`Min ${o.minute}: ${label.name} para ${mine ? "tu equipo" : "el rival"}`}</title>
+            <g key={i} data-tip={tip(label.name, row("Minuto", o.minute), row("Para", mine ? "Tu equipo" : "El rival"))}>
+              {/* Zona de hover más grande que la marca. */}
+              <circle cx={cx} cy={markerY} r={11} fill="transparent" />
               <circle cx={cx} cy={markerY} r={7} fill={mine ? "var(--chart-ahead)" : "var(--chart-behind)"} stroke="var(--color-surface)" strokeWidth="2" />
               <text x={cx} y={markerY} textAnchor="middle" dominantBaseline="central" fontSize="8" fontWeight="700" fill="var(--color-night)">
                 {label.letter}
@@ -287,12 +299,20 @@ function GoldChart({
 
       {hover !== null && hv !== null && (
         <div
-          className="pointer-events-none absolute top-1 rounded-md border border-line bg-night px-2 py-1 text-xs shadow"
-          style={{ left: Math.min(width - 150, Math.max(0, x(hover) + 10)) }}
+          className="tip-bubble pointer-events-none absolute top-1 w-44 rounded-lg border border-line bg-[#0c131d] px-3 py-2 text-xs leading-snug text-muted shadow-[0_10px_30px_-6px_rgba(0,0,0,0.7)]"
+          // A la derecha de la línea; si no cabe, a la izquierda.
+          style={x(hover) + 12 + 176 > width ? { left: x(hover) - 12 - 176 } : { left: x(hover) + 12 }}
         >
-          <p className="text-muted">Minuto {hover}</p>
-          <p className="font-semibold text-ink">
-            {hv === 0 ? "Oro parejo" : `${compact(Math.abs(hv))} de oro a favor de ${hv > 0 ? subject : "el rival"}`}
+          <p className="font-display text-[15px] leading-tight font-semibold text-ink">Minuto {hover}</p>
+          <p className="mt-1">
+            {hv === 0 ? (
+              "Oro parejo"
+            ) : (
+              <>
+                <span className={`font-semibold ${hv > 0 ? "text-[var(--chart-ahead)]" : "text-[var(--chart-behind)]"}`}>{compact(Math.abs(hv))}</span> de oro a
+                favor de {hv > 0 ? subject : "el rival"}
+              </>
+            )}
           </p>
         </div>
       )}

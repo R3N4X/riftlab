@@ -4,6 +4,7 @@
  */
 import Link from "next/link";
 import type { TftItem, TftTrait, TftUnit } from "@/lib/tft/data";
+import { tip, row } from "@/lib/tip";
 
 /** Borde según el costo, con los colores del juego. */
 export const COST_COLOR: Record<number, string> = {
@@ -40,7 +41,7 @@ export function TftItemIcon({ item, size = 18 }: { item: TftItem; size?: number 
 }
 
 /**
- * Objeto con su receta: al dejar el mouse encima un segundo (o al enfocarlo
+ * Objeto con su receta: al dejar el mouse encima un momento (o al enfocarlo
  * con el teclado) aparece el nombre y los dos componentes. Solo CSS.
  */
 export function TftItemWithRecipe({ item, items, size = 30 }: { item: TftItem; items: Record<string, TftItem>; size?: number }) {
@@ -57,9 +58,9 @@ export function TftItemWithRecipe({ item, items, size = 30 }: { item: TftItem; i
       />
       <span
         role="tooltip"
-        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 rounded-md border border-line bg-night px-3 py-2 text-xs whitespace-nowrap opacity-0 shadow-lg transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-1000 group-focus-visible:opacity-100 group-focus-visible:delay-0"
+        className="pointer-events-none absolute bottom-full left-1/2 z-30 mb-2 -translate-x-1/2 rounded-lg border border-line bg-[#0c131d] px-3 py-2.5 text-xs whitespace-nowrap text-muted opacity-0 shadow-[0_10px_30px_-6px_rgba(0,0,0,0.7)] transition-opacity duration-150 group-hover:opacity-100 group-hover:delay-300 group-focus-visible:opacity-100 group-focus-visible:delay-0"
       >
-        <span className="block font-medium text-ink">{item.name}</span>
+        <span className="block font-display text-[15px] leading-tight font-semibold text-ink">{item.name}</span>
         {from.length === 2 && (
           <span className="mt-1.5 flex items-center justify-center gap-1.5 text-muted">
             <TftItemIcon item={from[0]} size={22} />
@@ -96,7 +97,7 @@ export function TftUnitIcon({
       <img
         src={unit.icon}
         alt={unit.name}
-        title={`${unit.name} (${unit.cost} de oro)`}
+        title={tip(unit.name, row("Costo", `${unit.cost} de oro`))}
         width={size}
         height={size}
         loading="lazy"
@@ -117,7 +118,7 @@ export function TftUnitIcon({
 export function TraitBadge({ trait, style, count, size = 22 }: { trait: TftTrait; style: number; count?: number; size?: number }) {
   const bg = STYLE_BG[style] ?? STYLE_BG[0];
   return (
-    <span className="inline-flex items-center gap-1" title={`${trait.name}${style ? ` (${STYLE_LABEL[style]})` : ""}`}>
+    <span className="inline-flex items-center gap-1" title={style ? tip(trait.name, row("Nivel", STYLE_LABEL[style])) : trait.name}>
       <span
         className="flex items-center justify-center"
         style={{

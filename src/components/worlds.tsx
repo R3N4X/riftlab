@@ -15,6 +15,7 @@ import {
   type TeamCode,
   type WorldsMatch,
 } from "@/lib/worlds";
+import { tip, row } from "@/lib/tip";
 
 /*
  * Todo lo que depende de la hora va en el cliente: la página se arma en el servidor y ahí no se
@@ -581,7 +582,7 @@ function Team({ code, align, dim }: { code: TeamCode | null; align: "left" | "ri
   return (
     <span
       className={`flex min-w-0 items-center gap-2 ${align === "right" ? "flex-row-reverse text-right" : ""}`}
-      title={`${team.name} (${team.region})`}
+      title={tip(team.name, row("Región", team.region))}
     >
       <Logo code={code} size={22} faded={dim} />
       <span className={`font-display text-lg font-semibold ${dim ? "text-dim" : "text-ink"}`}>{code}</span>

@@ -6,6 +6,7 @@ import { PageHeader, Section, Skeleton } from "@/components/ui";
 import { num } from "@/lib/format";
 import { avgPlace, getTftCatalog, getTftDataset, type TftItem } from "@/lib/tft/data";
 import { getTftItemStats } from "@/lib/tft/meta";
+import { tip, row } from "@/lib/tip";
 
 export const metadata: Metadata = { title: "TFT · Objetos" };
 
@@ -50,7 +51,7 @@ async function ItemsContent() {
                   <div className="flex items-baseline justify-between gap-2">
                     <p className="truncate font-semibold">{item.name}</p>
                     {stat && (
-                      <span className="shrink-0 text-sm" title={`${num(stat.games)} veces`}>
+                      <span className="shrink-0 text-sm" title={tip("Colocación promedio", row("Veces armado", num(stat.games)))}>
                         <PlaceValue value={avgPlace(stat)} />
                       </span>
                     )}

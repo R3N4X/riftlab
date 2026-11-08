@@ -2,6 +2,16 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.26 (08-11-2026)
+
+- Gráfico "Asesinatos y muertes en el tiempo" del resumen renovado:
+  - una fila para asesinatos, asistencias y muertes, cada una con su total;
+  - lo que pasó en el mismo minuto se junta en una columna, con la cantidad dentro del punto;
+  - al pasar el mouse muestra todo lo de ese minuto.
+- Los radares del perfil, del resumen y de Comparar muestran en cada eje la nota, tu valor, lo normal en tu rol y qué mide.
+- Gráfico de oro: las marcas de objetivos ya no se tapan entre sí y tienen su propio recuadro, y el recuadro que sigue al mouse tiene el mismo estilo que el resto de la app.
+- Unos 30 hover que eran una línea de texto ahora muestran título y filas: maestría, rango, puesto, guardianes, premades, emparejamientos, unidades y rasgos de TFT, equipos de Worlds y otros.
+
 ## 0.2.25 (05-11-2026)
 
 - Nuevo panel "Sesión de hoy" en el perfil, con las partidas desde las 5:00 de todas las colas:

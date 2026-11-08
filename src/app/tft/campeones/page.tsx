@@ -5,6 +5,7 @@ import { PageHeader, Skeleton } from "@/components/ui";
 import { pct } from "@/lib/format";
 import { getTftCatalog, getTftDataset } from "@/lib/tft/data";
 import { getTftUnitStats } from "@/lib/tft/meta";
+import { tip, row } from "@/lib/tip";
 
 export const metadata: Metadata = { title: "TFT · Campeones" };
 
@@ -82,7 +83,7 @@ async function UnitsContent() {
                           {s.items.map((it) => {
                             const item = catalog.items[it.id];
                             return item ? (
-                              <li key={it.id} className="flex flex-col items-center text-[11px]" title={`${item.name}: ${it.games} partidas`}>
+                              <li key={it.id} className="flex flex-col items-center text-[11px]" title={tip(item.name, row("Partidas", it.games))}>
                                 <TftItemIcon item={item} size={28} />
                                 <PlaceValue value={it.avgPlace} />
                               </li>

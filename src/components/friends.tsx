@@ -12,6 +12,7 @@ import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { img } from "@/lib/assets";
 import type { LiveFriend, LiveState } from "@/lib/live";
 import { useLiveState } from "./live-client";
+import { tip } from "@/lib/tip";
 
 export interface FriendChampion {
   id: string;
@@ -184,7 +185,7 @@ export function FriendsBox({ champions, version, onNavigate }: { champions: Frie
           type="button"
           onClick={() => setAlerts(!on)}
           aria-pressed={on}
-          title={on ? "Avisos activados: te avisamos cuando alguien con quien juegas seguido entra a partida" : "Avisos desactivados"}
+          title={on ? tip("Avisos activados", "Te avisamos cuando alguien con quien juegas seguido entra a partida.") : "Avisos desactivados"}
           className={`rounded p-1 ${on ? "text-gold" : "text-dim"} hover:bg-raised`}
         >
           <svg

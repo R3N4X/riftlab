@@ -12,6 +12,7 @@ import { getChampionsByKey, getItems, getLatestVersion, getRuneIndex, type Champ
 import { duration, kda } from "@/lib/format";
 import { getGameReview, type GameReview, type LaneReview, type ReviewEvent } from "@/lib/game-review";
 import { parseString } from "@/lib/params";
+import { tip, row } from "@/lib/tip";
 import { RiotApiError, apiPuuid, errorMessage, getMatch, getMatchIds, hasRiotKey, isRiotBusy, riotIdToSlug, type Match } from "@/lib/riot";
 import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
@@ -119,7 +120,7 @@ async function ReviewContent({ params, searchParams }: Pick<PageProps<"/resumen/
             <span className="text-base text-muted">{kda(me.kills, me.deaths, me.assists)} KDA</span>
           </p>
         </div>
-        <div className="flex flex-col items-center" title={`Nota ${review.score} de 100 comparada con lo normal en su rol`}>
+        <div className="flex flex-col items-center" title={tip("Nota de la partida", row("Nota", `${review.score} de 100`), "50 es lo normal en tu rol; la letra resume la nota.")}>
           <span
             className={`grid h-20 w-20 place-items-center rounded-full border-2 font-display text-5xl font-bold ${GRADE_CLASS[review.grade]}`}
           >
@@ -334,13 +335,28 @@ function LanePanel({ lane, champsByKey, version }: { lane: LaneReview; champsByK
   );
 }
 
-const EVENT_STYLE: Record<ReviewEvent["kind"], { y: number; r: number; className: string; label: string }> = {
-  kill: { y: 18, r: 6, className: "fill-win", label: "Mataste a" },
-  assist: { y: 34, r: 4, className: "fill-hex", label: "Asistencia contra" },
-  death: { y: 50, r: 6, className: "fill-loss", label: "Te mató" },
-};
+const EVENT_ROWS = [
+  { kind: "kill", label: "Asesinatos", tipLabel: "Mataste a", dot: "bg-win" },
+  { kind: "assist", label: "Asistencias", tipLabel: "Asistencias", dot: "bg-hex" },
+  { kind: "death", label: "Muertes", tipLabel: "Te mató", dot: "bg-loss" },
+] as const;
 
-/** Línea del tiempo de la partida: asesinatos arriba, asistencias al medio y muertes abajo. */
+/** Alto de cada fila del gráfico, en píxeles. */
+const ROW_H = 28;
+
+/** "Yasuo", "Yasuo y Malphite", "Yasuo (2), Malphite y Nami". */
+function joinNames(names: string[]): string {
+  const counted = new Map<string, number>();
+  for (const n of names) counted.set(n, (counted.get(n) ?? 0) + 1);
+  const parts = [...counted].map(([n, c]) => (c > 1 ? `${n} (${c})` : n));
+  return parts.length > 1 ? `${parts.slice(0, -1).join(", ")} y ${parts.at(-1)}` : (parts[0] ?? "");
+}
+
+/**
+ * Línea del tiempo de la partida: una fila para asesinatos, asistencias y muertes. Lo que pasó en
+ * el mismo minuto se junta en una sola columna (con la cantidad dentro del punto) y el hover de la
+ * columna cuenta todo lo de ese minuto.
+ */
 function EventsStrip({
   events,
   minutes,
@@ -350,50 +366,99 @@ function EventsStrip({
   minutes: number;
   champsByKey: Record<string, ChampionSummary>;
 }) {
-  const W = 1000;
-  const x = (m: number) => 30 + (m / Math.max(1, minutes)) * (W - 60);
+  const total = Math.max(1, Math.ceil(minutes));
+  const at = (m: number) => `${(m / total) * 100}%`;
   const ticks = Array.from({ length: Math.floor(minutes / 5) + 1 }, (_, i) => i * 5);
   const counts = { kill: 0, assist: 0, death: 0 };
-  for (const e of events) counts[e.kind]++;
+  const byMinute = new Map<number, ReviewEvent[]>();
+  for (const e of events) {
+    counts[e.kind]++;
+    byMinute.set(e.minute, [...(byMinute.get(e.minute) ?? []), e]);
+  }
+  const nameOf = (e: ReviewEvent) =>
+    (e.other !== null ? champsByKey[e.other]?.name : null) ?? (e.kind === "death" ? "Torre o monstruo" : "Un rival");
+  const columns = [...byMinute].sort((a, b) => a[0] - b[0]);
+  const describe = (minute: number, list: ReviewEvent[]) =>
+    tip(
+      `Minuto ${minute}`,
+      ...EVENT_ROWS.map((r) => {
+        const names = list.filter((e) => e.kind === r.kind).map(nameOf);
+        return names.length > 0 && row(r.tipLabel, joinNames(names));
+      }),
+    );
+
   return (
-    <figure className="mt-3">
-      <svg viewBox={`0 0 ${W} 78`} className="w-full" role="img" aria-label="Asesinatos, asistencias y muertes por minuto">
-        <rect x={x(0)} y={4} width={x(Math.min(15, minutes)) - x(0)} height={56} className="fill-raised/50" />
-        <text x={x(0) + 4} y={14} className="fill-dim text-[10px]">
-          Fase de líneas
-        </text>
-        {(["kill", "assist", "death"] as const).map((k) => (
-          <line key={k} x1={x(0)} x2={x(minutes)} y1={EVENT_STYLE[k].y} y2={EVENT_STYLE[k].y} className="stroke-line" strokeWidth={1} />
+    <figure className="mt-4">
+      <div className="grid grid-cols-[minmax(0,auto)_minmax(0,1fr)] gap-x-4">
+        <ul className="text-xs text-muted" aria-hidden="true">
+          {EVENT_ROWS.map((r) => (
+            <li key={r.kind} className="flex items-center gap-1.5 whitespace-nowrap" style={{ height: ROW_H }}>
+              <span className={`h-2 w-2 rounded-full ${r.dot}`} />
+              {r.label}
+              <span className="font-semibold text-ink tabular-nums">{counts[r.kind]}</span>
+            </li>
+          ))}
+        </ul>
+
+        <div className="relative" style={{ height: ROW_H * EVENT_ROWS.length }}>
+          {/* Fase de líneas (hasta el 15) de fondo. */}
+          <div className="absolute inset-y-0 left-0 rounded-md bg-raised/40" style={{ width: at(Math.min(15, minutes)) }} />
+          {EVENT_ROWS.map((r, i) => (
+            <div key={r.kind} className="absolute inset-x-0 border-t border-line/80" style={{ top: ROW_H * i + ROW_H / 2 }} />
+          ))}
+          {ticks.map((t) => (
+            <div key={t} className="absolute inset-y-0 border-l border-dashed border-line/50" style={{ left: at(t) }} />
+          ))}
+
+          {columns.map(([minute, list]) => (
+            <div
+              key={minute}
+              data-tip={describe(minute, list)}
+              className="absolute inset-y-0 -translate-x-1/2 cursor-help rounded-md hover:bg-raised"
+              style={{ left: at(minute + 0.5), width: `max(${100 / total}%, 14px)` }}
+            >
+              {EVENT_ROWS.map((r, i) => {
+                const n = list.filter((e) => e.kind === r.kind).length;
+                if (!n) return null;
+                return (
+                  <span
+                    key={r.kind}
+                    className={`absolute left-1/2 flex -translate-x-1/2 -translate-y-1/2 items-center justify-center rounded-full ring-2 ring-surface ${r.dot} ${
+                      n > 1 ? "h-4 w-4 text-[10px] leading-none font-bold text-night" : r.kind === "assist" ? "h-2.5 w-2.5" : "h-3 w-3"
+                    }`}
+                    style={{ top: ROW_H * i + ROW_H / 2 }}
+                  >
+                    {n > 1 ? n : null}
+                  </span>
+                );
+              })}
+            </div>
+          ))}
+        </div>
+
+        <span />
+        <div className="relative mt-1 h-4 text-[11px] text-dim" aria-hidden="true">
+          {ticks.map((t) => (
+            <span key={t} className="absolute -translate-x-1/2 tabular-nums" style={{ left: at(t) }}>
+              {t}
+            </span>
+          ))}
+          <span className="absolute right-0 translate-x-full pl-1">min</span>
+        </div>
+      </div>
+
+      <ul className="sr-only">
+        {columns.map(([minute, list]) => (
+          <li key={minute}>{describe(minute, list).replace(/\t/g, ": ").replace(/\n/g, ". ")}</li>
         ))}
-        {ticks.map((t) => (
-          <text key={t} x={x(t)} y={74} textAnchor="middle" className="fill-dim text-[11px]">
-            {t}
-          </text>
-        ))}
-        {events.map((e, i) => {
-          const s = EVENT_STYLE[e.kind];
-          const other = e.other !== null ? champsByKey[e.other]?.name : null;
-          return (
-            <circle key={i} cx={x(e.minute + 0.5)} cy={s.y} r={s.r} className={`${s.className} stroke-surface`} strokeWidth={2}>
-              <title>{`Minuto ${e.minute}: ${s.label} ${other ?? (e.kind === "death" ? "una torre o un monstruo" : "un rival")}`}</title>
-            </circle>
-          );
-        })}
-      </svg>
-      <figcaption className="mt-1 flex flex-wrap gap-4 text-xs text-muted">
+      </ul>
+
+      <figcaption className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-dim">
         <span>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-win" aria-hidden="true" />
-          {counts.kill} asesinatos
+          <span className="mr-1 inline-block h-2 w-3 rounded-sm bg-raised" aria-hidden="true" />
+          Fase de líneas (hasta el minuto 15)
         </span>
-        <span>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-hex" aria-hidden="true" />
-          {counts.assist} asistencias
-        </span>
-        <span>
-          <span className="mr-1 inline-block h-2 w-2 rounded-full bg-loss" aria-hidden="true" />
-          {counts.death} muertes
-        </span>
-        <span className="text-dim">Pasa el mouse por un punto para ver contra quién.</span>
+        <span>Los números dentro de un punto son varias jugadas en el mismo minuto. Pasa el mouse para ver contra quién.</span>
       </figcaption>
     </figure>
   );

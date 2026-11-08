@@ -6,6 +6,7 @@ import { useMemo, useState } from "react";
 import { img } from "@/lib/assets";
 import { timeAgo } from "@/lib/format";
 import { ChampIcon } from "./icons";
+import { tip, row } from "@/lib/tip";
 
 export interface MasteryRow {
   key: string;
@@ -101,7 +102,7 @@ export function MasteryGrid({ rows, version, now }: { rows: MasteryRow[]; versio
                   aria-valuemin={0}
                   aria-valuemax={100}
                   aria-valuenow={Math.round(progress * 100)}
-                  title={r.until > 0 ? `Faltan ${r.until.toLocaleString("es-CL")} p. para el nivel ${r.level + 1}` : undefined}
+                  title={r.until > 0 ? tip(`Nivel ${r.level + 1}`, row("Faltan", `${r.until.toLocaleString("es-CL")} p.`)) : undefined}
                 >
                   <div className="h-full rounded-full bg-gold/80" style={{ width: `${Math.round(progress * 100)}%` }} />
                 </div>

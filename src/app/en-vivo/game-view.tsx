@@ -10,6 +10,7 @@ import { getChampion, getItems, type ChampionSummary } from "@/lib/ddragon";
 import { compact, pct, wrClass } from "@/lib/format";
 import { getChampionStats, type DraftInsights, type ScalingRow } from "@/lib/stats";
 import { counterReason } from "@/lib/stats/reasons";
+import { tip, row } from "@/lib/tip";
 
 type Champs = Record<string, ChampionSummary>;
 
@@ -188,7 +189,7 @@ function ScalingPanel({ rows }: { rows: ScalingRow[] }) {
               const advantage = r.ally - r.enemy;
               const tone = Math.abs(advantage) < 0.005 ? "text-muted" : advantage > 0 ? "text-win" : "text-loss";
               return (
-                <li key={r.phase} className="flex items-center gap-3 py-2.5" title={`Muestra mínima: ${compact(r.games)} partidas`}>
+                <li key={r.phase} className="flex items-center gap-3 py-2.5" title={tip(PHASE_ROW[r.phase].label, row("Partidas de muestra", compact(r.games)))}>
                   <span className="w-32 text-sm">{PHASE_ROW[r.phase].label}</span>
                   <span className="flex-1 text-xs text-muted">{PHASE_ROW[r.phase].range}</span>
                   <span className={`font-display text-lg font-semibold ${tone}`}>
@@ -224,7 +225,7 @@ function LaneStatePanel({ me, role, draft, version }: { me: ChampionSummary; rol
       </div>
       <div
         className="rounded-lg border border-line bg-surface p-3"
-        title="Según la diferencia de oro promedio al minuto 15 en este enfrentamiento."
+        title={tip("Estado de la línea", "Según la diferencia de oro promedio al minuto 15 en este enfrentamiento.")}
       >
         <p className={`font-display text-lg font-semibold ${verdict ? tone : "text-dim"}`}>{verdict ?? "Sin datos"}</p>
         <p className="text-xs text-muted">Estado de la línea (0 a 15 min)</p>
@@ -247,7 +248,7 @@ function LanesPanel({ draft, champs, version }: { draft: DraftInsights; champs: 
             <div
               key={l.role}
               className="flex min-w-0 flex-col items-center gap-1.5"
-              title={l.games ? `${compact(l.games)} partidas` : "Sin partidas registradas"}
+              title={l.games ? tip(`${a?.name ?? "—"} contra ${e?.name ?? "—"}`, wr !== null && row("Winrate", pct(wr, 1)), row("Partidas", compact(l.games))) : "Sin partidas registradas"}
             >
               <span className={`text-sm font-semibold ${wr === null ? "text-dim" : wrClass(wr)}`}>{wr === null ? "—" : pct(wr, 0)}</span>
               <span className="w-full truncate text-xs">{a?.name ?? "—"}</span>

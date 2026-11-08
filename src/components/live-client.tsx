@@ -20,6 +20,7 @@ import {
   type LiveState,
   type SettingsPatch,
 } from "@/lib/live";
+import { tip, row } from "@/lib/tip";
 
 /* ---------- Estado del cliente de League ---------- */
 
@@ -191,7 +192,7 @@ export function LiveSync() {
     return (
       <Pill
         tone="idle"
-        title="Lee la selección de campeones desde el cliente de League. Ábrela con npm run desktop:dev o el acceso directo RiftLab."
+        title={tip("Solo en la app de escritorio", "Lee la selección de campeones desde el cliente de League. Abre RiftLab con su acceso directo.")}
       >
         Solo en la app de escritorio
       </Pill>
@@ -205,7 +206,7 @@ export function LiveSync() {
       ? (TIMER_LABEL[state.champSelect?.timerPhase ?? ""] ?? PHASE_LABEL.ChampSelect)
       : (PHASE_LABEL[state.phase] ?? state.phase);
   return (
-    <Pill tone="ok" title={s ? `${s.gameName}#${s.tagLine}${s.platform ? ` (${PLATFORMS[s.platform].label})` : ""}` : undefined}>
+    <Pill tone="ok" title={s ? tip(`${s.gameName}#${s.tagLine}`, s.platform && row("Servidor", PLATFORMS[s.platform].label)) : undefined}>
       {label}
     </Pill>
   );

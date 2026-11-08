@@ -7,6 +7,7 @@
  */
 import { ROLES, type Role } from "./constants";
 import type { Match, MatchParticipant } from "./riot";
+import { row, tip } from "./tip";
 
 export type AxisId = "combate" | "dano" | "oro" | "objetivos" | "supervivencia" | "vision";
 export type BenchRole = Role | "ANY";
@@ -38,15 +39,6 @@ export const CS_BENCH: Record<BenchRole, number> = { TOP: 7, JUNGLE: 6, MIDDLE: 
 /** Guardianes de control por partida típicos de cada rol. */
 export const CONTROL_WARDS_BENCH: Record<BenchRole, number> = { TOP: 1, JUNGLE: 2.5, MIDDLE: 1.2, BOTTOM: 1, UTILITY: 4, ANY: 0 };
 
-export const AXIS_FMT: Record<AxisId, (v: number) => string> = {
-  combate: (v) => `${Math.round(v * 100)} % de participación en asesinatos`,
-  dano: (v) => `${Math.round(v * 100)} % del daño de su equipo`,
-  oro: (v) => `${Math.round(v)} de oro por minuto`,
-  objetivos: (v) => `${Math.round(v * 100)} % del daño de su equipo a objetivos`,
-  supervivencia: (v) => `${v.toFixed(1)} muertes cada 30 minutos`,
-  vision: (v) => `${v.toFixed(2)} de visión por minuto`,
-};
-
 export const AXIS_SHORT: Record<AxisId, (v: number) => string> = {
   combate: (v) => `${Math.round(v * 100)} %`,
   dano: (v) => `${Math.round(v * 100)} %`,
@@ -55,6 +47,29 @@ export const AXIS_SHORT: Record<AxisId, (v: number) => string> = {
   supervivencia: (v) => v.toFixed(1),
   vision: (v) => v.toFixed(2),
 };
+
+/** Qué mide cada eje, para el tooltip del radar. */
+const AXIS_MEANS: Record<AxisId, string> = {
+  combate: "Participación en los asesinatos del equipo.",
+  dano: "Parte del daño a campeones de su equipo.",
+  oro: "Oro por minuto.",
+  objetivos: "Parte del daño de su equipo a torres, dragones y barones.",
+  supervivencia: "Muertes cada 30 minutos: menos es mejor.",
+  vision: "Puntaje de visión por minuto.",
+};
+
+/** Tooltip de un eje del radar: nota, el valor medido y lo normal en su rol (sin valor: la nota no aplica). */
+export function axisTip(id: AxisId, score: number | null, value?: number, bench?: number, valueLabel = "Esta partida"): string {
+  if (score === null || value === undefined || bench === undefined)
+    return tip(AXIS_LABEL[id], AXIS_MEANS[id], valueLabel === "Esta partida" ? "No aplica en esta partida." : "Sin datos en estas partidas.");
+  return tip(
+    AXIS_LABEL[id],
+    row("Nota", `${score} de 100`),
+    row(valueLabel, AXIS_SHORT[id](value)),
+    row("Normal en su rol", AXIS_SHORT[id](bench)),
+    AXIS_MEANS[id],
+  );
+}
 
 export interface AxisSample {
   id: AxisId;

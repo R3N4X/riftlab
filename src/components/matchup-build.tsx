@@ -9,6 +9,7 @@ import { getItems, getRuneIndex, type ChampionSummary } from "@/lib/ddragon";
 import { pct, wrClass } from "@/lib/format";
 import { getMatchupBuild, getMatchupOpponents } from "@/lib/stats";
 import { ChampIcon, ItemIcon, RuneIcon } from "./icons";
+import { tip, row } from "@/lib/tip";
 
 type Champs = Record<string, ChampionSummary>;
 
@@ -52,7 +53,7 @@ export async function MatchupBuildPanel({
                 href={hrefFor(o.key)}
                 scroll={false}
                 aria-current={active ? "true" : undefined}
-                title={`Contra ${c.name} (${o.games} partidas)`}
+                title={tip(`Contra ${c.name}`, row("Partidas", o.games))}
                 className={`block rounded-md p-0.5 ${active ? "ring-2 ring-gold" : "opacity-70 hover:opacity-100"}`}
               >
                 <ChampIcon version={version} id={c.id} name={c.name} size={34} />

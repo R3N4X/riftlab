@@ -7,7 +7,7 @@
 import { QUEUES, ROLE_LABEL, ROLES, type Role } from "@/lib/constants";
 import { kda } from "@/lib/format";
 import { row, tip } from "@/lib/tip";
-import { AXIS_FMT, AXIS_LABEL, AXIS_ORDER, AXIS_SHORT, gameAxes, ratioToScore, type AxisId } from "@/lib/performance";
+import { axisTip, AXIS_LABEL, AXIS_ORDER, gameAxes, ratioToScore, type AxisId } from "@/lib/performance";
 import type { ActiveGame, Match, MatchParticipant } from "@/lib/riot";
 import { ChampIcon } from "./icons";
 import type { MatchCardData } from "./match-card";
@@ -231,13 +231,13 @@ function playstyle(games: Game[]) {
 
   const axes: Axis[] = AXIS_ORDER.map((id) => {
     const a = acc[id];
-    if (!a.n) return { id, label: AXIS_LABEL[id], score: null, why: `${AXIS_LABEL[id]}: sin datos en estas partidas` };
+    if (!a.n) return { id, label: AXIS_LABEL[id], score: null, why: axisTip(id, null, undefined, undefined, "Promedio") };
     const score = ratioToScore(a.ratio / a.n);
     return {
       id,
       label: AXIS_LABEL[id],
       score,
-      why: `${AXIS_LABEL[id]} ${score}: ${AXIS_FMT[id](a.value / a.n)}; lo normal en su rol es ${AXIS_SHORT[id](a.bench / a.n)}`,
+      why: axisTip(id, score, a.value / a.n, a.bench / a.n, "Promedio"),
     };
   });
 
@@ -310,8 +310,8 @@ export function PlaystyleRadar({ axes, score }: { axes: Axis[]; score: number })
           const [x, y] = point(i, 1.2);
           const anchor = Math.abs(x - cx) < 4 ? "middle" : x > cx ? "start" : "end";
           return (
-            <g key={a.id}>
-              <title>{a.why}</title>
+            <g key={a.id} data-tip={a.why} className="cursor-help">
+              <HitBox x={x} y={y} anchor={anchor} />
               <text x={x} y={y + 4} textAnchor={anchor} className="text-[11px]">
                 <tspan className="fill-muted">{a.label} </tspan>
                 <tspan className={`font-semibold ${scoreClass(a.score)}`}>{a.score ?? "—"}</tspan>
@@ -347,4 +347,10 @@ export function RecentForm({ matches, puuid, data }: { matches: Match[]; puuid: 
       })}
     </ol>
   );
+}
+
+/** Zona invisible detrás del rótulo de un eje, para que el hover no dependa de apuntar a las letras. */
+export function HitBox({ x, y, anchor, width = 96 }: { x: number; y: number; anchor: "start" | "middle" | "end"; width?: number }) {
+  const left = anchor === "start" ? x - 4 : anchor === "end" ? x - width + 4 : x - width / 2;
+  return <rect x={left} y={y - 9} width={width} height={18} rx={4} fill="transparent" className="hover:fill-raised/60" />;
 }

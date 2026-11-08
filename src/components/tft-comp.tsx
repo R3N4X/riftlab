@@ -9,6 +9,7 @@ import { pct } from "@/lib/format";
 import type { TftCatalog } from "@/lib/tft/data";
 import type { CompDifficulty, CompStyle, CompUnit, CompView } from "@/lib/tft/meta";
 import { BOARD_COLS, BOARD_ROWS, suggestPositions } from "@/lib/tft/positioning";
+import { tip, bullet } from "@/lib/tip";
 
 export type CatalogLite = Pick<TftCatalog, "units" | "items" | "traits">;
 
@@ -28,7 +29,7 @@ const DIFFICULTY_TONE: Record<CompDifficulty["level"], string> = {
 export function CompTags({ style, difficulty }: { style: CompStyle; difficulty: CompDifficulty }) {
   return (
     <span className="flex flex-wrap gap-1.5 text-xs">
-      <span className="inline-flex items-center gap-1 rounded-full border border-hex/60 px-2 py-0.5 text-hex" title={style.howTo}>
+      <span className="inline-flex items-center gap-1 rounded-full border border-hex/60 px-2 py-0.5 text-hex" title={tip(style.label, style.howTo)}>
         <svg
           viewBox="0 0 16 16"
           className="h-3 w-3"
@@ -43,7 +44,7 @@ export function CompTags({ style, difficulty }: { style: CompStyle; difficulty: 
         </svg>
         {style.label}
       </span>
-      <span className={`rounded-full border px-2 py-0.5 ${DIFFICULTY_TONE[difficulty.level]}`} title={difficulty.reasons.join(". ") + "."}>
+      <span className={`rounded-full border px-2 py-0.5 ${DIFFICULTY_TONE[difficulty.level]}`} title={tip(`Dificultad: ${difficulty.level}`, ...difficulty.reasons.map((r) => bullet(`${r}.`)))}>
         {difficulty.level}
       </span>
     </span>

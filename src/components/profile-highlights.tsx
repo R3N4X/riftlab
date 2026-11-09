@@ -46,7 +46,7 @@ export function ProfileHighlights({
   const games = matches
     .map((m) => ({ m, me: m.info.participants.find((p) => p.puuid === puuid) }))
     .filter((g): g is Game => Boolean(g.me) && g.m.info.gameDuration >= 300)
-    .slice(0, 10);
+    .slice(0, 20);
 
   // Las etiquetas solo dicen lo que el radar no muestra (visión, muertes y peleas ya están ahí).
   const tags: Tag[] = [];
@@ -205,12 +205,12 @@ const WEAK_STYLE: Record<AxisId, { title: string; detail: string }> = {
   vision: { title: "Juega a ciegas", detail: "Pone y quita menos visión que lo normal en su rol" },
 };
 
-/** Perfil de juego de las últimas 10 partidas válidas (null con menos de 3). */
+/** Perfil de juego de las últimas 20 partidas válidas (null con menos de 3). */
 export function profileStyle(matches: Match[], puuid: string) {
   const games = matches
     .map((m) => ({ m, me: m.info.participants.find((p) => p.puuid === puuid) }))
     .filter((g): g is Game => Boolean(g.me) && g.m.info.gameDuration >= 300)
-    .slice(0, 10);
+    .slice(0, 20);
   return games.length >= 3 ? playstyle(games) : null;
 }
 
@@ -330,11 +330,11 @@ export function RecentForm({ matches, puuid, data }: { matches: Match[]; puuid: 
   const games = matches
     .map((m) => ({ m, p: m.info.participants.find((x) => x.puuid === puuid) }))
     .filter((g) => g.p && g.m.info.gameDuration >= 300)
-    .slice(0, 10)
+    .slice(0, 20)
     .reverse();
   if (!games.length) return null;
   return (
-    <ol className="mt-2 flex gap-0.5" aria-label={`Últimas ${games.length} partidas, de la más vieja a la más nueva`}>
+    <ol className="mt-2 grid w-fit grid-cols-10 gap-0.5" aria-label={`Últimas ${games.length} partidas, de la más vieja a la más nueva`}>
       {games.map(({ m, p }) => {
         const champ = data.champsByKey[p!.championId];
         return (

@@ -2,6 +2,16 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.27 (09-11-2026)
+
+- El perfil muestra las últimas 20 partidas en vez de 10: forma reciente, estilo de juego y lo más destacado se calculan con 20.
+- Nuevo gráfico "Evolución de LP" en las tarjetas de Solo/Dúo y Flexible:
+  - una línea con cada clasificatoria registrada, verde si ganaste LP y roja si perdiste;
+  - al pasar el mouse muestra la fecha, los LP y el rango en que quedaste;
+  - mejor rango registrado y victorias y derrotas registradas;
+  - si jugaste con RiftLab cerrada, una línea punteada lleva hasta tu rango actual.
+- Solo aparece en tu cuenta y con las clasificatorias jugadas con la app abierta (Riot no entrega el historial de LP).
+
 ## 0.2.26 (08-11-2026)
 
 - Gráfico "Asesinatos y muertes en el tiempo" del resumen renovado:

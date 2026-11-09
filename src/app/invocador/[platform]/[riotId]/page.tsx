@@ -19,6 +19,7 @@ import { getChampionRoleGames } from "@/lib/stats";
 import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
 import { SessionToday } from "@/components/session-today";
+import { LpHistory } from "@/components/lp-history";
 import { dayStart, daySession } from "@/lib/session";
 import {
   RiotApiError,
@@ -90,7 +91,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
   }
 
   const queueFilter = QUEUE_FILTERS.find((q) => q.id === parseString(sp, "cola")) ?? QUEUE_FILTERS[0];
-  const count = Math.min(60, Math.max(10, Number(parseString(sp, "n")) || 10));
+  const count = Math.min(60, Math.max(20, Number(parseString(sp, "n")) || 20));
 
   const profile = await loadProfile(platform, id.gameName, id.tagLine, count, queueFilter.queue);
 
@@ -122,6 +123,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
     const flex = entries.find((e) => e.queueType === "RANKED_FLEX_SR");
     const recent = summarize(matches, account.puuid);
     const tilt = tiltCheck(matches, account.puuid, data.now);
+    const riotIdText = `${account.gameName}#${account.tagLine}`;
     const lastPlayed = matches[0]
       ? (matches[0].info.gameEndTimestamp ?? matches[0].info.gameCreation + matches[0].info.gameDuration * 1000)
       : null;
@@ -168,15 +170,15 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
 
         {(session || tilt) && (
           <div className="space-y-4 px-4 pt-6 sm:px-8">
-            {session && <SessionToday session={session} riotId={`${account.gameName}#${account.tagLine}`} data={data} />}
+            {session && <SessionToday session={session} riotId={riotIdText} data={data} />}
             {tilt && <TiltBanner notice={tilt} />}
           </div>
         )}
 
         <div className="grid gap-6 px-4 py-6 sm:px-8 xl:grid-cols-[340px_minmax(0,1fr)]">
           <aside className="space-y-6">
-            <RankedCard title="Clasificatoria Solo/Dúo" entry={solo} />
-            <RankedCard title="Clasificatoria Flexible" entry={flex} />
+            <RankedCard title="Clasificatoria Solo/Dúo" entry={solo} riotId={riotIdText} queueId={420} />
+            <RankedCard title="Clasificatoria Flexible" entry={flex} riotId={riotIdText} queueId={440} />
 
             {recent.games > 0 && (
               <Panel className="p-4">
@@ -445,7 +447,7 @@ function Metric({ label, children }: { label: string; children: React.ReactNode 
   );
 }
 
-function RankedCard({ title, entry }: { title: string; entry?: LeagueEntry }) {
+function RankedCard({ title, entry, riotId, queueId }: { title: string; entry?: LeagueEntry; riotId: string; queueId: number }) {
   return (
     <Panel className="p-4">
       <h2 className="mb-3 text-sm text-muted">{title}</h2>
@@ -470,6 +472,7 @@ function RankedCard({ title, entry }: { title: string; entry?: LeagueEntry }) {
       ) : (
         <p className="font-display text-xl text-dim">Sin clasificar</p>
       )}
+      <LpHistory riotId={riotId} queueId={queueId} current={entry} />
     </Panel>
   );
 }

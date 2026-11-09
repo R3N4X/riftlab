@@ -35,7 +35,7 @@ function subscribe(onChange: () => void) {
 
 const EMPTY: Record<string, LpChange> = {};
 
-function useLpChanges() {
+export function useLpChanges() {
   return useSyncExternalStore(
     subscribe,
     () => changes,
@@ -49,7 +49,7 @@ function changeOf(all: Record<string, LpChange>, matchId: string, riotId: string
   return change && change.riotId.toLowerCase() === riotId.toLowerCase() ? change : null;
 }
 
-const signed = (delta: number) => `${delta > 0 ? "+" : delta < 0 ? "−" : "±"}${Math.abs(delta)}`;
+export const signed = (delta: number) => `${delta > 0 ? "+" : delta < 0 ? "−" : "±"}${Math.abs(delta)}`;
 
 /** LP netos del día en las clasificatorias registradas, con el rango después de la última. */
 export function SessionLp({ matchIds, riotId }: { matchIds: string[]; riotId: string }) {

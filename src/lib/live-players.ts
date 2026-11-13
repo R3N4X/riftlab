@@ -70,6 +70,34 @@ export interface LivePlayerInfo {
    * últimas partidas. `games` es cuántas de esas partidas compartió con alguien del grupo.
    */
   premade: { group: number; games: number } | null;
+  /**
+   * Ya te tocó en una de tus últimas partidas (sin contar a tus premades). `gamesAgo` es 1 si fue en
+   * tu partida anterior; `ally` dice si estuvo en tu equipo; `win` es tu resultado esa vez.
+   */
+  metBefore: { gamesAgo: number; games: number; ally: boolean; win: boolean; championId: number } | null;
+}
+
+/** Cuántas de tus partidas anteriores se revisan para "ya te tocó". */
+const MET_WINDOW = 5;
+
+/** Jugadores de esta partida que ya estuvieron en alguna de tus últimas partidas, por puuid. */
+function findMetBefore(players: LivePlayerInfo[], me: string, myMatches: Match[]): Map<string, NonNullable<LivePlayerInfo["metBefore"]>> {
+  const result = new Map<string, NonNullable<LivePlayerInfo["metBefore"]>>();
+  const self = players.find((p) => p.puuid === me);
+  for (const p of players) {
+    if (!p.puuid || p.puuid === me) continue;
+    // Con tus premades ya se sabe que juegan juntos.
+    if (self?.premade && p.teamId === self.teamId && p.premade?.group === self.premade.group) continue;
+    for (const [i, m] of myMatches.entries()) {
+      const mine = m.info.participants.find((x) => x.puuid === me);
+      const theirs = m.info.participants.find((x) => x.puuid === p.puuid);
+      if (!mine || !theirs) continue;
+      const seen = result.get(p.puuid);
+      if (seen) seen.games++;
+      else result.set(p.puuid, { gamesAgo: i + 1, games: 1, ally: mine.teamId === theirs.teamId, win: mine.win, championId: theirs.championId });
+    }
+  }
+  return result;
 }
 
 /**
@@ -246,12 +274,23 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
         role: null,
         mainRole: classic ? mainRoleOf(top, recent, roleGames) : null,
         premade: null,
+        metBefore: null,
       };
     }),
   );
 
   const premades = findPremades(players, matchesOf);
   for (const p of players) p.premade = premades.get(p.puuid) ?? null;
+
+  // Tus partidas anteriores de cualquier cola (sin caché: la anterior pudo terminar hace un minuto).
+  const myIds = isRiotBusy(platform, 55, true) ? null : await getMatchIds(platform, puuid, { count: MET_WINDOW }).catch(() => null);
+  if (myIds?.length) {
+    const myMatches = (await Promise.all(myIds.map((id) => getMatch(platform, id).catch(() => null)))).filter(
+      (m): m is Match => m !== null,
+    );
+    const met = findMetBefore(players, puuid, myMatches);
+    for (const p of players) p.metBefore = met.get(p.puuid) ?? null;
+  }
 
   // En la Grieta cada equipo se ordena por línea: así cada jugador queda frente a su rival.
   if (classic) {

@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.28 (12-11-2026)
+
+- En la pantalla de carga, los jugadores que ya te tocaron en una de tus últimas 5 partidas muestran "Contigo" o "Contra ti" y cuándo (por ejemplo, "Contra ti en tu partida anterior"). Al pasar el mouse se ve con qué campeón jugó y si ganaste o perdiste. Tus premades no se marcan.
+
 ## 0.2.27 (09-11-2026)
 
 - El perfil muestra las últimas 20 partidas en vez de 10: forma reciente, estilo de juego y lo más destacado se calculan con 20.

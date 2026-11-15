@@ -325,7 +325,9 @@ function PlayerCard({
   const champ = champs[p.championId];
   const games = p.rank ? p.rank.wins + p.rank.losses : 0;
   const wr = p.rank ? p.rank.wins / Math.max(1, games) : 0;
-  const flags = flagsFor(p, champ?.name ?? "el campeón");
+  // Modo streamer: Riot cambia su nombre por el del campeón, sin tag, y no entrega su perfil ni sus datos.
+  const hidden = !p.isMe && (!p.tagLine || !p.puuid);
+  const flags = hidden ? [] : flagsFor(p, champ?.name ?? "el campeón");
   const main = p.mainRole;
   // Autofill: juega una línea distinta de la que más juega, y esa línea es clara (al menos la mitad de su juego).
   const autofill = Boolean(p.role && main && main.role !== p.role && main.share >= 0.5);
@@ -372,14 +374,29 @@ function PlayerCard({
       </div>
 
       <div className="flex flex-1 flex-col text-xs">
-        <Link
-          href={`/invocador/${platform}/${encodeURIComponent(`${p.gameName}-${p.tagLine}`)}`}
-          className={`block truncate px-2.5 pt-1 pb-2 text-sm hover:text-gold-soft ${p.isMe ? "text-gold-soft" : ""}`}
-          title={`${p.gameName}#${p.tagLine}`}
-        >
-          {p.gameName}
-          <span className="text-dim">#{p.tagLine}</span>
-        </Link>
+        {hidden ? (
+          <p
+            className="flex cursor-help items-center gap-1.5 px-2.5 pt-1 pb-2 text-sm text-muted"
+            title={tip("Modo streamer", "Este jugador oculta su nombre. Riot no entrega su perfil, su rango ni sus partidas.")}
+          >
+            <svg viewBox="0 0 24 24" className="h-3.5 w-3.5 shrink-0" fill="none" stroke="currentColor" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+              <path d="M17.94 17.94A10 10 0 0 1 12 20C5 20 1 12 1 12a18 18 0 0 1 5.06-5.94" />
+              <path d="M9.9 4.24A9 9 0 0 1 12 4c7 0 11 8 11 8a18 18 0 0 1-2.16 3.19" />
+              <path d="M14.12 14.12a3 3 0 1 1-4.24-4.24" />
+              <path d="M1 1l22 22" />
+            </svg>
+            Modo streamer
+          </p>
+        ) : (
+          <Link
+            href={`/invocador/${platform}/${encodeURIComponent(`${p.gameName}-${p.tagLine}`)}`}
+            className={`block truncate px-2.5 pt-1 pb-2 text-sm hover:text-gold-soft ${p.isMe ? "text-gold-soft" : ""}`}
+            title={`${p.gameName}#${p.tagLine}`}
+          >
+            {p.gameName}
+            <span className="text-dim">#{p.tagLine}</span>
+          </Link>
+        )}
         {p.premade && mates.length > 0 && <PremadeBadge group={p.premade.group} games={p.premade.games} mates={mates} />}
         {p.metBefore && !p.isMe && <MetBeforeBadge met={p.metBefore} champ={champs[p.metBefore.championId]?.name} />}
 
@@ -399,7 +416,7 @@ function PlayerCard({
               </div>
             </>
           ) : (
-            <p className="text-dim">Sin clasificar</p>
+            <p className="text-dim">{hidden ? "Rango oculto" : "Sin clasificar"}</p>
           )}
         </div>
 
@@ -415,14 +432,14 @@ function PlayerCard({
                   <span className="text-dim">{Math.round(main.share * 100)} %</span>
                 </>
               ) : (
-                <span className="text-dim">Sin datos</span>
+                <span className="text-dim">{hidden ? "Oculto" : "Sin datos"}</span>
               )}
             </dd>
           </div>
           <div className="min-w-0">
             <dt className="text-[11px] text-dim">Maestría</dt>
             <dd className="truncate text-ink">
-              {p.mastery ? `Nv. ${p.mastery.level} · ${compact(p.mastery.points)}` : <span className="text-dim">Nunca lo jugó</span>}
+              {p.mastery ? `Nv. ${p.mastery.level} · ${compact(p.mastery.points)}` : <span className="text-dim">{hidden ? "Oculta" : "Nunca lo jugó"}</span>}
             </dd>
           </div>
         </dl>

@@ -502,7 +502,12 @@ async function LiveGame({ game, data }: { game: ActiveGame; data: MatchCardData 
             {name}
           </Link>
         ) : (
-          <span className="truncate text-muted">{champ?.name}</span>
+          <span
+            className="cursor-help truncate text-muted"
+            title={tip("Modo streamer", "Este jugador oculta su nombre. Riot no entrega su perfil.")}
+          >
+            Modo streamer
+          </span>
         )}
       </div>
     );

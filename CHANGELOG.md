@@ -2,6 +2,11 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.29 (15-11-2026)
+
+- Los jugadores en modo streamer ya no llevan a un perfil que no existe. En la pantalla de carga y en la partida en curso del perfil aparecen como "Modo streamer", con un aviso al pasar el mouse que explica que Riot no entrega su perfil, su rango ni sus partidas.
+- Sus tarjetas en la pantalla de carga dicen "Rango oculto" y "Oculto" en vez de "Sin clasificar" o "Sin datos", y ya no muestran avisos como "Primera vez con" que salían de datos que Riot no entrega.
+
 ## 0.2.28 (12-11-2026)
 
 - En la pantalla de carga, los jugadores que ya te tocaron en una de tus últimas 5 partidas muestran "Contigo" o "Contra ti" y cuándo (por ejemplo, "Contra ti en tu partida anterior"). Al pasar el mouse se ve con qué campeón jugó y si ganaste o perdiste. Tus premades no se marcan.

@@ -2,6 +2,10 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.30 (17-11-2026)
+
+- En la selección, el texto bajo las recomendaciones ("Ekko: Le va bien contra...") sigue al campeón que tienes elegido en el cliente. Antes, si tocabas uno en la grilla y después elegías otro en el cliente, seguía mostrando el que habías tocado.
+
 ## 0.2.29 (15-11-2026)
 
 - Los jugadores en modo streamer ya no llevan a un perfil que no existe. En la pantalla de carga y en la partida en curso del perfil aparecen como "Modo streamer", con un aviso al pasar el mouse que explica que Riot no entrega su perfil, su rango ni sus partidas.

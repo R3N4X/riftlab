@@ -175,12 +175,16 @@ export function LiveSync() {
   // Con el cliente conectado y sin selección ni partida (menú, sala, fin de partida) la vista vuelve a quedar vacía;
   // solo se conserva la última si se pierde la conexión.
   const query = draft ? draftToQuery(draft, Boolean(state?.game && !state.champSelect)) : state?.connected ? "" : null;
-  // La vista previa de una recomendación (?ver=) se conserva mientras dura la selección y no fijas campeón.
   // Tus campeones con más maestría, para recomendarte también los que mejor juegas.
   const pool = state?.champSelect ? masteryPool(state.mastery) : "";
   const withPool = query && pool ? `${query}&mios=${pool}` : query;
+  // La vista previa de una recomendación (?ver=) se conserva mientras dura la selección y no fijas campeón,
+  // pero se descarta si en el cliente pasas a otro campeón: desde ahí manda el que tienes elegido.
   const preview = searchParams.get("ver");
-  const target = withPool && preview && state?.champSelect && !withPool.includes("fijo=1") ? `${withPool}&ver=${preview}` : withPool;
+  const newYo = withPool ? new URLSearchParams(withPool).get("yo") : null;
+  const yoChanged = newYo !== searchParams.get("yo") && newYo !== preview;
+  const keepPreview = Boolean(withPool && preview && state?.champSelect && !withPool.includes("fijo=1") && !yoChanged);
+  const target = keepPreview ? `${withPool}&ver=${preview}` : withPool;
   const currentQuery = searchParams.toString();
 
   useEffect(() => {

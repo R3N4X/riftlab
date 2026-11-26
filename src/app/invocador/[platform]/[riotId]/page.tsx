@@ -9,7 +9,7 @@ import { ProfileHighlights, RecentForm } from "@/components/profile-highlights";
 import { AutoRetry, RefreshProfile } from "@/components/refresh-profile";
 import { SummonerSearch } from "@/components/summoner-search";
 import { ErrorNote, Panel, Section, Skeleton } from "@/components/ui";
-import { PLATFORMS, QUEUES, ROLE_LABEL, ROLES, TIER_LABEL, isPlatform, type Platform, type Role, type Tier } from "@/lib/constants";
+import { PLATFORMS, ROLE_LABEL, ROLES, TIER_LABEL, isPlatform, modeName, type Platform, type Role, type Tier } from "@/lib/constants";
 import { getChampionList, getChampionsByKey, getItems, getLatestVersion, getRuneIndex, getSummonerSpells, img } from "@/lib/ddragon";
 import { rememberPlayers } from "@/lib/players";
 import { kda, nameWidth, pct, timeAgo, wrClass } from "@/lib/format";
@@ -20,6 +20,7 @@ import { tiltCheck } from "@/lib/tilt";
 import { TiltBanner } from "@/components/tilt-notice";
 import { SessionToday } from "@/components/session-today";
 import { LpHistory } from "@/components/lp-history";
+import { RankHistory } from "@/components/rank-history";
 import { dayStart, daySession } from "@/lib/session";
 import {
   RiotApiError,
@@ -179,6 +180,7 @@ async function SummonerContent({ params, searchParams }: Pick<PageProps<"/invoca
           <aside className="space-y-6">
             <RankedCard title="Clasificatoria Solo/Dúo" entry={solo} riotId={riotIdText} queueId={420} />
             <RankedCard title="Clasificatoria Flexible" entry={flex} riotId={riotIdText} queueId={440} />
+            <RankHistory gameName={account.gameName} tagLine={account.tagLine} platform={platform} />
 
             {recent.games > 0 && (
               <Panel className="p-4">
@@ -477,50 +479,104 @@ function RankedCard({ title, entry, riotId, queueId }: { title: string; entry?: 
   );
 }
 
-async function LiveGame({ game, data }: { game: ActiveGame; data: MatchCardData }) {
+type LivePlayer = ActiveGame["participants"][number];
+
+function LiveGameTitle({ modeLabel, minutes }: { modeLabel: string; minutes: number }) {
+  return (
+    <h2 className="mb-4 font-display text-2xl font-semibold">
+      Partida en curso{" "}
+      <span className="text-base font-normal text-muted">
+        {modeLabel}, minuto {Math.max(0, minutes)}
+      </span>
+    </h2>
+  );
+}
+
+function LiveGamePlayer({ p, side, data }: { p: LivePlayer; side: "left" | "right"; data: MatchCardData }) {
   const { version, champsByKey, spells, platform } = data;
+  const champ = champsByKey[p.championId];
+  const [name, tag] = (p.riotId ?? "").split("#");
+  return (
+    <div className={`flex min-w-0 items-center gap-2 text-sm ${side === "right" ? "flex-row-reverse text-right" : ""}`}>
+      {champ && <ChampIcon version={version} id={champ.id} name={champ.name} size={32} />}
+      <span className="flex shrink-0 flex-col gap-0.5">
+        {[p.spell1Id, p.spell2Id].map((s) =>
+          spells[s] ? <SpellIcon key={s} version={version} file={spells[s].image.full} name={spells[s].name} size={14} /> : null,
+        )}
+      </span>
+      {name && tag ? (
+        <Link href={`/invocador/${platform}/${riotIdToSlug(name, tag)}`} className="truncate hover:text-gold-soft">
+          {name}
+        </Link>
+      ) : (
+        <span className="cursor-help truncate text-muted" title={tip("Modo streamer", "Este jugador oculta su nombre. Riot no entrega su perfil.")}>
+          Modo streamer
+        </span>
+      )}
+    </div>
+  );
+}
+
+/**
+ * Partida sin dos equipos de cinco (Arena): todos en una grilla. Si Riot informa la pareja de cada
+ * jugador (playerSubteamId), se agrupan por pareja; si no, solo se listan.
+ */
+function FreeForAllGame({ game, data, modeLabel, minutes }: { game: ActiveGame; data: MatchCardData; modeLabel: string; minutes: number }) {
+  const subteam = (p: LivePlayer) => (p as LivePlayer & { playerSubteamId?: number }).playerSubteamId;
+  const groups = new Map<number, LivePlayer[]>();
+  if (game.participants.every((p) => subteam(p))) {
+    for (const p of game.participants) groups.set(subteam(p)!, [...(groups.get(subteam(p)!) ?? []), p]);
+  }
+  return (
+    <Panel className="border-win/40 p-5">
+      <LiveGameTitle modeLabel={modeLabel} minutes={minutes} />
+      {groups.size > 1 ? (
+        <ul className="grid gap-3 sm:grid-cols-2">
+          {[...groups.entries()]
+            .sort((a, b) => a[0] - b[0])
+            .map(([id, players]) => (
+              <li key={id} className="space-y-1.5 rounded-md border border-line/60 p-2">
+                {players.map((p, i) => (
+                  <LiveGamePlayer key={`${p.puuid}-${i}`} p={p} side="left" data={data} />
+                ))}
+              </li>
+            ))}
+        </ul>
+      ) : (
+        <>
+          <p className="mb-2 text-sm text-muted">{game.participants.length} jugadores</p>
+          <ul className="grid gap-x-6 gap-y-1.5 sm:grid-cols-2">
+            {game.participants.map((p, i) => (
+              <li key={`${p.puuid}-${i}`}>
+                <LiveGamePlayer p={p} side="left" data={data} />
+              </li>
+            ))}
+          </ul>
+          {game.gameMode === "CHERRY" && <p className="mt-3 text-xs text-dim">Riot no informa las parejas de Arena mientras se juega la partida.</p>}
+        </>
+      )}
+    </Panel>
+  );
+}
+
+async function LiveGame({ game, data }: { game: ActiveGame; data: MatchCardData }) {
   const minutes = Math.floor(game.gameLength / 60);
+  const modeLabel = modeName(game.gameQueueConfigId, game.gameMode);
   const teams = [100, 200].map((teamId) => game.participants.filter((p) => p.teamId === teamId));
+  // Arena y otros modos sin dos equipos de cinco: van en una sola lista (o por pareja, si Riot la informa).
+  if (teams.some((t) => !t.length) || teams[0].length + teams[1].length < game.participants.length) {
+    return <FreeForAllGame game={game} data={data} modeLabel={modeLabel} minutes={minutes} />;
+  }
   // En la Grieta se ordena cada equipo por línea, para ver a cada uno frente a su rival.
   const roleGames = game.gameMode === "CLASSIC" ? await getChampionRoleGames() : null;
   const [blue, red] = teams.map((t) => (roleGames ? sortByLane(t, roleGames) : t.map((player) => ({ player, role: null }))));
   const byLane = blue.every((b) => b.role) && red.every((r) => r.role);
 
-  const player = (p: ActiveGame["participants"][number], side: "left" | "right") => {
-    const champ = champsByKey[p.championId];
-    const [name, tag] = (p.riotId ?? "").split("#");
-    return (
-      <div className={`flex min-w-0 items-center gap-2 text-sm ${side === "right" ? "flex-row-reverse text-right" : ""}`}>
-        {champ && <ChampIcon version={version} id={champ.id} name={champ.name} size={32} />}
-        <span className="flex shrink-0 flex-col gap-0.5">
-          {[p.spell1Id, p.spell2Id].map((s) =>
-            spells[s] ? <SpellIcon key={s} version={version} file={spells[s].image.full} name={spells[s].name} size={14} /> : null,
-          )}
-        </span>
-        {name && tag ? (
-          <Link href={`/invocador/${platform}/${riotIdToSlug(name, tag)}`} className="truncate hover:text-gold-soft">
-            {name}
-          </Link>
-        ) : (
-          <span
-            className="cursor-help truncate text-muted"
-            title={tip("Modo streamer", "Este jugador oculta su nombre. Riot no entrega su perfil.")}
-          >
-            Modo streamer
-          </span>
-        )}
-      </div>
-    );
-  };
+  const player = (p: LivePlayer, side: "left" | "right") => <LiveGamePlayer p={p} side={side} data={data} />;
 
   return (
     <Panel className="border-win/40 p-5">
-      <h2 className="mb-4 font-display text-2xl font-semibold">
-        Partida en curso{" "}
-        <span className="text-base font-normal text-muted">
-          {QUEUES[game.gameQueueConfigId] ?? game.gameMode}, minuto {Math.max(0, minutes)}
-        </span>
-      </h2>
+      <LiveGameTitle modeLabel={modeLabel} minutes={minutes} />
       {byLane ? (
         <div className="grid grid-cols-[minmax(0,1fr)_auto_minmax(0,1fr)] items-center gap-x-3 gap-y-1.5">
           <p className="text-sm text-hex">Equipo azul</p>

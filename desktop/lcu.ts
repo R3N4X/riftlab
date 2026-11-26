@@ -21,7 +21,9 @@ import type {
   LivePlayer,
   LiveState,
   LpChange,
+  RankMark,
   RunePagePayload,
+  SeasonRanks,
 } from "../src/lib/live";
 
 /* ---------- LP por partida ---------- */
@@ -44,6 +46,27 @@ function rankPoints(s: RankedSnapshot): number | null {
   if (APEX.has(s.tier)) return TIERS.indexOf("MASTER") * 400 + s.lp;
   const division = DIVISIONS.indexOf(s.division);
   return division < 0 ? null : tier * 400 + division * 100 + s.lp;
+}
+
+/* ---------- Rangos por temporada ---------- */
+
+interface RawRankedStats {
+  queues?: {
+    queueType: string;
+    highestTier?: string;
+    highestDivision?: string;
+    previousSeasonEndTier?: string;
+    previousSeasonEndDivision?: string;
+    previousSeasonHighestTier?: string;
+    previousSeasonHighestDivision?: string;
+  }[];
+  seasons?: Record<string, { currentSeasonId?: number; currentSeasonEnd?: number } | undefined>;
+}
+
+/** Rango del cliente → RankMark; sin rango ("", "NONE", "UNRANKED") da undefined. */
+function rankMark(tier?: string, division?: string): RankMark | undefined {
+  if (!tier || !TIERS.includes(tier as Tier)) return undefined;
+  return { tier, division: APEX.has(tier) || !DIVISIONS.includes(division ?? "") ? "" : division! };
 }
 
 interface PendingLp {
@@ -680,6 +703,43 @@ export class LeagueClient {
     return res.status >= 200 && res.status < 300
       ? { ok: true, message: kind === "ban" ? "Bloqueo marcado en el cliente (sin confirmar)." : "Campeón seleccionado en el cliente (sin fijar)." }
       : { ok: false, message: "El cliente no dejó seleccionar ese campeón." };
+  }
+
+  /**
+   * Rangos de esta temporada y de la anterior de cualquier jugador del servidor del cliente (lo
+   * mismo que muestra su perfil en el cliente). Se busca por Riot ID porque el puuid del cliente no
+   * es el de la API. null si el cliente no está abierto o no encuentra al jugador.
+   */
+  async rankedSeasons(gameName: string, tagLine: string): Promise<SeasonRanks[] | null> {
+    if (!this.creds) return null;
+    const who = await request<{ puuid?: string } | null>(
+      this.creds,
+      "GET",
+      `/lol-summoner/v1/alias/lookup?${new URLSearchParams({ gameName, tagLine })}`,
+    );
+    const puuid = who.status === 200 ? who.data?.puuid : undefined;
+    if (!puuid) return null;
+    const res = await request<RawRankedStats>(this.creds, "GET", `/lol-ranked/v1/ranked-stats/${encodeURIComponent(puuid)}`);
+    if (res.status !== 200 || !res.data) return null;
+
+    const queue = (type: string) => res.data.queues?.find((q) => q.queueType === type);
+    const season = res.data.seasons?.RANKED_SOLO_5x5 ?? res.data.seasons?.RANKED_FLEX_SR;
+    const seasonId = season?.currentSeasonId;
+    if (!seasonId) return null;
+    const now: SeasonRanks = { seasonId, endsAt: season.currentSeasonEnd || null, current: true };
+    const before: SeasonRanks = { seasonId: seasonId - 1, endsAt: null, current: false };
+    for (const [key, type] of [
+      ["solo", "RANKED_SOLO_5x5"],
+      ["flex", "RANKED_FLEX_SR"],
+    ] as const) {
+      const q = queue(type);
+      if (!q) continue;
+      const peak = rankMark(q.highestTier, q.highestDivision);
+      if (peak) now[key] = { peak };
+      const last = { peak: rankMark(q.previousSeasonHighestTier, q.previousSeasonHighestDivision), end: rankMark(q.previousSeasonEndTier, q.previousSeasonEndDivision) };
+      if (last.peak || last.end) before[key] = last;
+    }
+    return [now, before];
   }
 
   /** Acepta la partida encontrada, salvo que ya la hayas aceptado o rechazado tú en el cliente. */

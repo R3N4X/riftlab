@@ -49,6 +49,7 @@ const bridge: DesktopBridge = {
     ipcRenderer.on("lp:changed", listener);
     return () => ipcRenderer.removeListener("lp:changed", listener);
   },
+  getRankHistory: (gameName: string, tagLine: string, platform: string) => ipcRenderer.invoke("ranks:get", gameName, tagLine, platform),
   toggleTftOverlay: () => ipcRenderer.invoke("tft:overlay"),
   onAutoAccept: (callback) => {
     const listener = (_e: IpcRendererEvent, status: AutoAcceptStatus) => callback(status);

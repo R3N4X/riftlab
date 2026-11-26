@@ -452,13 +452,22 @@ function PlayerCard({
               {p.recent.map((g, i) => (
                 <li
                   key={i}
-                  className={`flex h-5 w-5 items-center justify-center rounded ${g.win ? "bg-win/25 ring-1 ring-win/60" : "bg-loss/25 ring-1 ring-loss/60"}`}
-                  title={tip(g.win ? "Victoria" : "Derrota", row("Campeón", champs[g.championId]?.name ?? "Otro"), g.role && row("Línea", ROLE_LABEL[g.role]), row("KDA", `${g.kills}/${g.deaths}/${g.assists}`))}
+                  className={`flex h-5 w-5 items-center justify-center overflow-hidden rounded ${g.win ? "bg-win/25 ring-1 ring-win/60" : "bg-loss/25 ring-1 ring-loss/60"}`}
+                  title={tip(
+                    g.win ? "Victoria" : "Derrota",
+                    row("Modo", g.mode),
+                    row("Campeón", champs[g.championId]?.name ?? "Otro"),
+                    g.role && row("Línea", ROLE_LABEL[g.role]),
+                    row("KDA", `${g.kills}/${g.deaths}/${g.assists}`),
+                  )}
                 >
+                  {/* Con línea (Grieta) se muestra la línea; sin línea (ARAM, Arena...), el campeón que jugó. */}
                   {g.role ? (
                     <RoleIcon role={g.role} size={11} />
+                  ) : champs[g.championId] ? (
+                    <img src={img.champion(version, champs[g.championId].id)} alt="" width={20} height={20} className={g.win ? "" : "opacity-70"} />
                   ) : (
-                    <span className={`h-1.5 w-1.5 rounded-full ${g.win ? "bg-win" : "bg-loss"}`} />
+                    <span className="text-[9px] font-semibold text-ink">{g.mode.slice(0, 2)}</span>
                   )}
                 </li>
               ))}

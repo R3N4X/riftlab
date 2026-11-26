@@ -24,7 +24,11 @@ import {
   type AutoImportParts,
   type DesktopSettings,
   type LpChange,
+  type RankHistory,
+  type RankMark,
   type RunePagePayload,
+  type SeasonQueueRanks,
+  type SeasonRanks,
   type SettingsPatch,
   type TftPlanPayload,
   type UpdateStatus,
@@ -597,6 +601,67 @@ league.onLpChange = (change) => {
 };
 
 ipcMain.handle("lp:get", () => readLpChanges());
+
+/* ---------- Rangos por temporada ---------- */
+
+// El cliente solo entrega esta temporada y la anterior: lo que se ve se guarda para que el
+// historial de cada jugador crezca con el tiempo.
+const ranksFile = () => join(app.getPath("userData"), "rangos.json");
+type StoredRanks = Record<string, { at: number; seasons: Record<string, SeasonRanks> }>;
+const MAX_STORED_PLAYERS = 3000;
+const RANK_TIERS = ["IRON", "BRONZE", "SILVER", "GOLD", "PLATINUM", "EMERALD", "DIAMOND", "MASTER", "GRANDMASTER", "CHALLENGER"];
+const RANK_DIVISIONS = ["IV", "III", "II", "I"];
+
+function readRanks(): StoredRanks {
+  try {
+    return JSON.parse(readFileSync(ranksFile(), "utf8")) as StoredRanks;
+  } catch {
+    return {};
+  }
+}
+
+const rankValue = (m: RankMark) => RANK_TIERS.indexOf(m.tier) * 4 + Math.max(0, RANK_DIVISIONS.indexOf(m.division));
+
+function mergeQueue(old?: SeasonQueueRanks, next?: SeasonQueueRanks): SeasonQueueRanks | undefined {
+  if (!old) return next;
+  if (!next) return old;
+  const peak = !old.peak ? next.peak : !next.peak ? old.peak : rankValue(next.peak) >= rankValue(old.peak) ? next.peak : old.peak;
+  return { peak, end: next.end ?? old.end };
+}
+
+ipcMain.handle("ranks:get", async (_e, gameName: string, tagLine: string, platform: string): Promise<RankHistory | null> => {
+  const key = `${platform}:${gameName}#${tagLine}`.toLowerCase();
+  const all = readRanks();
+  const stored = all[key]?.seasons ?? {};
+  // El cliente solo conoce a los jugadores de su propio servidor.
+  const fresh = league.state.summoner?.platform === platform ? await league.rankedSeasons(gameName, tagLine).catch(() => null) : null;
+  const seasons = { ...stored };
+  for (const s of fresh ?? []) {
+    const old = seasons[s.seasonId];
+    seasons[s.seasonId] = {
+      seasonId: s.seasonId,
+      endsAt: s.endsAt ?? old?.endsAt ?? null,
+      current: s.current,
+      solo: mergeQueue(old?.solo, s.solo),
+      flex: mergeQueue(old?.flex, s.flex),
+    };
+  }
+  const list = Object.values(seasons)
+    .map((s) => ({ ...s, current: s.endsAt !== null && s.endsAt > Date.now() }))
+    .sort((a, b) => b.seasonId - a.seasonId);
+  if (fresh) {
+    all[key] = { at: Date.now(), seasons };
+    const kept = Object.entries(all)
+      .sort((a, b) => b[1].at - a[1].at)
+      .slice(0, MAX_STORED_PLAYERS);
+    try {
+      writeFileSync(ranksFile(), JSON.stringify(Object.fromEntries(kept)));
+    } catch {
+      // si no se puede guardar, igual se muestra lo que entregó el cliente
+    }
+  }
+  return list.length ? { seasons: list, live: Boolean(fresh) } : null;
+});
 
 ipcMain.handle("account:get", () => account);
 

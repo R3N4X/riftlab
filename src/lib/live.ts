@@ -196,6 +196,39 @@ export interface LpChange {
   at: number;
 }
 
+/** Un rango sin LP: "DIAMOND" + "II" (en Maestro y más arriba la división va vacía). */
+export interface RankMark {
+  tier: string;
+  division: string;
+}
+
+/** Rangos de una temporada en una cola: el máximo alcanzado y, si ya terminó, el final. */
+export interface SeasonQueueRanks {
+  peak?: RankMark;
+  end?: RankMark;
+}
+
+/**
+ * Rangos de un jugador por temporada, leídos del cliente de League (la API de Riot solo entrega
+ * el actual). El cliente da esta temporada y la anterior; la app guarda lo que va viendo para que
+ * el historial crezca con el tiempo.
+ */
+export interface SeasonRanks {
+  /** Id de temporada del cliente (sube de a uno con cada temporada). */
+  seasonId: number;
+  /** Cuándo termina o terminó (ms); null si no se sabe. */
+  endsAt: number | null;
+  current: boolean;
+  solo?: SeasonQueueRanks;
+  flex?: SeasonQueueRanks;
+}
+
+export interface RankHistory {
+  seasons: SeasonRanks[];
+  /** Se pudo consultar el cliente ahora (si no, son solo los datos guardados). */
+  live: boolean;
+}
+
 /** Estado de las actualizaciones automáticas (solo en la app instalada). */
 export interface UpdateStatus {
   state: "disabled" | "idle" | "checking" | "downloading" | "ready" | "none" | "error";
@@ -245,6 +278,11 @@ export interface DesktopBridge {
   /** LP ganados o perdidos por partida clasificatoria, por id de partida. */
   getLpChanges(): Promise<Record<string, LpChange>>;
   onLpChange(callback: (change: LpChange) => void): () => void;
+  /**
+   * Rangos por temporada de un jugador (solo del servidor de la cuenta abierta en el cliente).
+   * null si no hay datos: el cliente está cerrado y no hay nada guardado, o es de otro servidor.
+   */
+  getRankHistory(gameName: string, tagLine: string, platform: string): Promise<RankHistory | null>;
   /** Muestra u oculta la ventana flotante de TFT; devuelve si quedó visible. */
   toggleTftOverlay(): Promise<boolean>;
 }

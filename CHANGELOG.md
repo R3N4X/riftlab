@@ -2,6 +2,12 @@
 
 Cada versión publicada, de la más nueva a la más vieja. El texto de cada versión es también el de su página de descarga en GitHub (lo toma `scripts/publicar-version.ps1`).
 
+## 0.2.31 (26-11-2026)
+
+- Nuevo recuadro "Historial de rangos" en el perfil: el rango máximo de cada temporada en Solo/Dúo y Flexible, y con qué rango terminó. Riot entrega esta temporada y la anterior; RiftLab guarda lo que ve de cada jugador para ir sumando las siguientes. Funciona en la app de escritorio con jugadores de tu servidor.
+- La partida en curso de Arena muestra a todos los jugadores juntos (antes aparecían todos en "Equipo azul") y el modo dice "Arena" en vez de "CHERRY".
+- En la pantalla de carga, las últimas partidas sin línea (ARAM, Arena y otros modos) muestran el campeón que jugó en vez de un punto, y el hover dice el modo.
+
 ## 0.2.30 (17-11-2026)
 
 - En la selección, el texto bajo las recomendaciones ("Ekko: Le va bien contra...") sigue al campeón que tienes elegido en el cliente. Antes, si tocabas uno en la grilla y después elegías otro en el cliente, seguía mostrando el que habías tocado.

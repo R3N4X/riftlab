@@ -8,7 +8,7 @@
  * cerca del límite. Solo se pide una vez por partida.
  */
 import { cacheLife } from "next/cache";
-import { ROLES, type Platform, type Role, type Tier } from "./constants";
+import { ROLES, modeName, type Platform, type Role, type Tier } from "./constants";
 import { sortByLane } from "./lanes";
 import {
   getActiveGame,
@@ -28,6 +28,8 @@ export interface LiveRecentGame {
   win: boolean;
   /** Línea que jugó en esa partida (null si no se sabe, por ejemplo en ARAM). */
   role: Role | null;
+  /** Modo o cola ("ARAM", "Arena", "Clasificatoria Solo/Dúo"...). */
+  mode: string;
   championId: number;
   kills: number;
   deaths: number;
@@ -242,7 +244,7 @@ export async function getLiveGameInfo(platform: Platform, puuid: string): Promis
             const me = m.info.participants.find((x) => x.puuid === p.puuid);
             if (!me || m.info.gameDuration < 300) return [];
             const role = ROLES.includes(me.teamPosition as Role) ? (me.teamPosition as Role) : null;
-            return [{ win: me.win, role, championId: me.championId, kills: me.kills, deaths: me.deaths, assists: me.assists }];
+            return [{ win: me.win, role, mode: modeName(m.info.queueId, m.info.gameMode), championId: me.championId, kills: me.kills, deaths: me.deaths, assists: me.assists }];
           });
         }
       }

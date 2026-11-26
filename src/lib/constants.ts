@@ -121,6 +121,19 @@ export const QUEUES: Record<number, string> = {
   2400: "ARAM: Caos",
 };
 
+/** Nombre del modo cuando la cola no está en QUEUES (las colas nuevas de Riot cambian de número). */
+export const GAME_MODE_LABEL: Record<string, string> = {
+  CLASSIC: "Grieta del Invocador",
+  ARAM: "ARAM",
+  CHERRY: "Arena",
+  KIWI: "ARAM: Caos",
+  URF: "URF",
+  ONEFORALL: "Uno para todos",
+};
+
+/** "ARAM", "Clasificatoria Solo/Dúo"... a partir de la cola o, si no se conoce, del modo. */
+export const modeName = (queueId: number, gameMode: string) => QUEUES[queueId] ?? GAME_MODE_LABEL[gameMode] ?? gameMode;
+
 /** Escalas de tier usadas en la tier list. */
 export const TIER_GRADES = ["S+", "S", "A", "B", "C", "D"] as const;
 export type TierGrade = (typeof TIER_GRADES)[number];
